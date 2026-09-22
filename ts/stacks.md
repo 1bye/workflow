@@ -1,8 +1,7 @@
 # Optional TypeScript stack profiles
 
-Choose a profile for each application or package. These are personal starting
-choices drawn from the audited projects, with runtime boundaries checked against
-official documentation on **2026-09-22**. Keep an existing project's stack unless
+Use these runtime-specific instructions when working on a TypeScript application
+or package. Choose the relevant profile and preserve the existing stack unless
 a migration is part of the task. Framework versions remain project decisions.
 
 Every profile uses [the TypeScript baseline](AGENTS.md) and the applicable
@@ -64,9 +63,6 @@ See [TanStack Start's scope](https://tanstack.com/start/latest/docs/framework/re
   without checking types, so a build alone is insufficient.
   [Vite TypeScript guidance](https://vite.dev/guide/features.html#typescript).
 
-Local reference: [daydb web manifest](/Users/yuriihulyk/Documents/GitHub/daydb/apps/web/package.json)
-and [browser config](/Users/yuriihulyk/Documents/GitHub/daydb/apps/web/tsconfig.json).
-
 ## Bun API
 
 Use Elysia for a Bun HTTP service. Keep route handlers thin and place cohesive
@@ -79,16 +75,11 @@ request-specific data through arguments. Framework callbacks remain functions.
 - **Config:** select Bun types and the module/output settings used by the actual
   runner or bundler. Browser globals do not belong in the service config. Keep
   database adapters and migrations attached to this application's storage choice.
-- **Skills:** the common testing/tooling skills below. An Elysia-specific skill
-  was identified in the audit but is not part of the curated collection yet.
+- **Skills:** the common testing/tooling skills below.
 - **Verify:** type check and build where applicable; test success, invalid input,
   authorization failures, and dependency failures through the HTTP boundary.
   Elysia supports request-level tests through `app.handle`; follow the installed
   version's setup requirements. [Elysia testing](https://elysiajs.com/patterns/unit-test).
-
-Local reference: [stem server manifest](/Users/yuriihulyk/Documents/GitHub/stem/apps/server/package.json).
-Its current entry point starts a listener and its manifest has no test script;
-reuse the stack, not an assumption that it already supplies the testing layout.
 
 ## Workers API
 
@@ -104,24 +95,17 @@ deployment runtime, even if local scripts and pure tests run under Bun.
   `wrangler types`. In Alchemy-managed projects, preserve their entry point and
   binding/type workflow rather than creating a competing Wrangler configuration.
   [Cloudflare TypeScript guidance](https://developers.cloudflare.com/workers/languages/typescript/).
-- **Skills:** common testing/tooling skills. Hono guidance remains a later skill
-  import; this profile does not require an unbundled skill.
+- **Skills:** common testing/tooling skills.
 - **Verify:** type check, request/contract tests, and a local Workers-runtime
   check of changed bindings or platform APIs using the project's existing
   emulator/test integration. Pure Bun tests do not verify Worker compatibility.
   Build/preview through the configured deployment adapter; publishing is a
   separate operation. [Hono on Workers](https://hono.dev/docs/getting-started/cloudflare-workers).
 
-Local references: [agent-bell server](/Users/yuriihulyk/Documents/GitHub/agent-bell/apps/server/package.json)
-and [Worker definition](/Users/yuriihulyk/Documents/GitHub/agent-bell/packages/infra/alchemy.run.ts).
-Its server `dev` and `test` scripts run under Bun; its infrastructure owns the Worker.
-
 ## Desktop
 
-Use Electron with React in the renderer and electron-vite for the existing
-main/preload/renderer build arrangement. Keep the application's implementation
-in TypeScript; the separate native-renderer targets in the source projects are
-outside this profile.
+Use Electron with React in the renderer and electron-vite for the
+main/preload/renderer build arrangement. Keep application code in TypeScript.
 
 - **Boundary:** the main process owns privileged filesystem/process operations.
   Expose narrow typed operations through preload; validate IPC payloads and
@@ -137,11 +121,6 @@ outside this profile.
   tests; build and launch Electron to exercise the changed operation. Check the
   packaged artifact when changing packaging, resource paths, or OS integration.
   Browser-only verification cannot prove the preload/main boundary works.
-
-Local reference: [1git desktop manifest](/Users/yuriihulyk/Documents/GitHub/1git/apps/desktop/package.json),
-with separate [renderer](/Users/yuriihulyk/Documents/GitHub/1git/apps/desktop/tsconfig.json),
-[Electron](/Users/yuriihulyk/Documents/GitHub/1git/apps/desktop/tsconfig.electron.json),
-and [test](/Users/yuriihulyk/Documents/GitHub/1git/apps/desktop/tsconfig.test.json) configs.
 
 ## Mobile
 
@@ -161,8 +140,8 @@ when an upgrade is requested.
   effective `lib` and `types`. [Expo TypeScript guidance](https://docs.expo.dev/guides/typescript/).
 - **Skills:** common testing/tooling and the platform-independent composition
   guidance. The curated React performance skill contains web/Next examples;
-  use only rules that fit React Native. Expo/native-specific skills remain a
-  later import; shadcn is for a separate DOM-based web target.
+  use only rules that fit React Native. Use shadcn for a separate DOM-based web
+  target.
 - **Verify:** type check and available behavior tests, then run the changed flow
   on a relevant simulator/device. Verify permissions, keyboard/safe-area behavior,
   navigation, and platform differences when affected. A web preview does not
@@ -170,8 +149,6 @@ when an upgrade is requested.
   [development build](https://docs.expo.dev/develop/development-builds/introduction/)
   when required by native modules.
 
-Local references: [daydb native manifest](/Users/yuriihulyk/Documents/GitHub/daydb/apps/native/package.json)
-and [Expo config](/Users/yuriihulyk/Documents/GitHub/daydb/apps/native/tsconfig.json).
 The profile covers TS application code; native platform toolchains remain build
 prerequisites. Prebuild, signing, and store submission are separate scoped tasks.
 
@@ -194,9 +171,6 @@ add terminal UI tooling only for an interactive application.
   Bun tests do not establish Node compatibility. Before publishing, inspect
   packed file contents and declarations using the project's packaging workflow.
 
-Local references: [1git Git package](/Users/yuriihulyk/Documents/GitHub/1git/packages/git/package.json)
-and [nanofect core exports](/Users/yuriihulyk/Documents/GitHub/nanofect/packages/core/package.json).
-
 ## Workspace layer
 
 Apply this alongside any runtime profile when multiple real packages share code.
@@ -209,8 +183,7 @@ Describe actual task inputs, environment dependencies, and output directories.
 Test cache restoration against real artifacts; do not copy `dist/**` into every
 task. Register prerequisites when a consumer needs built packages. Keep persistent
 development services uncached, and keep deployment/database mutations outside
-routine quality-check pipelines. Local reference:
-[1git task graph](/Users/yuriihulyk/Documents/GitHub/1git/turbo.json).
+routine quality-check pipelines.
 
 ## Common skills and optional dependencies
 
@@ -221,39 +194,5 @@ the other skills by the relevant profile and task.
 
 Effect, Drizzle/database drivers, Better Auth, Alchemy, and AI frameworks remain
 explicit project choices. Inspect installed versions and runtime compatibility
-before using their APIs. The audited projects span Effect 3 and Effect 4
-prereleases; this guide does not select a universal major version. The shared
-`cn` package and `shadcn/lint` choice remain unresolved in [TODO.md](../TODO.md).
-
-## Source and validation record
-
-Local manifests/configs were inspected at these project HEADs on 2026-09-22:
-
-| Project | HEAD | Used for |
-| --- | --- | --- |
-| `daydb` | `d6c9737164e9e922e841ea35526623ce95ae2c71` | Web and mobile |
-| `stem` | `28d4fd3e7eed92af4294ee873f5a4af6854a3a8b` | Bun API |
-| `agent-bell` | `9e5611af5116cbbeeed425c019e1adeb73f72a7d` | Workers API and infrastructure |
-| `1git` | `96c599345a6ef3cd91120b86e67862277b705a8d` | Electron, library, and workspace |
-| `nanofect` | `a8e023185d75b140cf2d4c29b50ded6c7b5c5736` | Library exports |
-
-These profiles are adoption guidance. Source examples establish existing patterns,
-not that each application passed the checks described here. The command inventory
-below was checked against package scripts; application builds, device runs, and
-deployments were not performed for this documentation step. The earlier isolated
-Git-package validation remains recorded in [the config guide](configs/README.md).
-
-Run script commands from the listed package directory, using its package manager.
-These are observed examples, not commands available in `workflow` itself.
-
-| Source package | Existing commands | Additional adoption check |
-| --- | --- | --- |
-| `daydb/apps/web` | `bun run check-types`, `bun run build` | Browser behavior; no package `test` script |
-| `stem/apps/server` | `bun run check-types`, `bun run build` | Add/run meaningful request tests; no package `test` script |
-| `agent-bell/apps/server` | `bun run check-types`, `bun run test`, `bun run build` | Workers-runtime/binding verification |
-| `1git/apps/desktop` | `bun run check-types`, `bun run test`, `bun run build` | Electron launch; packaging checks when affected |
-| `daydb/apps/native` | `bun run check-types`, `bun run start` | Native behavior; `start` is a development server, not a test |
-| `nanofect/packages/core` | `bun run check-types`, `bun run test`, `bun run build` | Built-export consumer check |
-
-Read the selected root formatter script too: `daydb`'s `check` writes fixes,
-while `1git`, `stem`, and `agent-bell` separate `check` from `fix`.
+before using their APIs. Match the installed major version and avoid dependency
+upgrades during unrelated feature work.

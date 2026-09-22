@@ -95,28 +95,10 @@ When merging into an existing config, preserve its framework-generated settings
 and adjust relative paths. See TypeScript's
 [inheritance rules](https://www.typescriptlang.org/tsconfig/extends.html).
 
-## Validation on 2026-09-21
+## Verify adoption
 
-Validated against an isolated copy of `1git/packages/git`, using project HEAD
-`96c599345a6ef3cd91120b86e67862277b705a8d`. Existing installed dependencies were
-reused. The source repository had unrelated uncommitted changes, so adoption was
-tested in a temporary directory and no source-project files were edited.
-
-Before applying the shared configs, the package passed its original type check
-and Biome check. In the copy, the shared TypeScript base replaced the old base;
-the consumer retained its Node/Bun types, module settings, and build behavior.
-Only formatting was applied to source and tests.
-
-| Check | Result |
-| --- | --- |
-| `biome format --write src tests`, then `biome check src tests` | 26 files formatted and checked successfully |
-| `biome check biome.json tsconfig.base.json` | Both configs passed |
-| `tsc --noEmit --project tsconfig.json` | Passed |
-| `tsc --project tsconfig.build.json` | JavaScript and declaration build passed |
-| `bun test` | 160 passed, 0 failed, 294 assertions across 12 test files |
-| Small OOP sample | Static-only class and readonly constructor parameter property accepted |
-| TypeScript diagnostic sample | Unsafe null/indexed access rejected; undeclared DOM/Node globals rejected |
-
-Runtime: Bun **1.4.2**. Compiler: TypeScript **6.0.3**. Formatter/linter: Biome
-**2.5.3** with Ultracite **7.9.4**. These results cover the selected Git package;
-other runtimes and framework profiles need their own adoption checks.
+Inspect the effective TypeScript config with the installed compiler's
+`tsc --showConfig -p tsconfig.json`. Confirm the intended runtime globals, source
+files, and output settings. Run the project's formatter check, type check,
+relevant tests, and build. For libraries, verify emitted declarations and package
+exports. Report the commands and results; keep fixes separate from checks.

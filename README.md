@@ -7,10 +7,8 @@ Personal TypeScript conventions and reusable instructions for AI coding agents.
 | [ts/AGENTS.md](ts/AGENTS.md) | General TypeScript coding and verification defaults |
 | [ts/react.md](ts/react.md) | React component ownership, UI organization, state, and styling |
 | [ts/stacks.md](ts/stacks.md) | Optional web, API, desktop, mobile, library/CLI, and workspace profiles |
-| [ts/configs/README.md](ts/configs/README.md) | Shared configs, adoption commands, and validation results |
-| [ts/skills/](ts/skills/) | Six curated skills with supporting references and local scope notes |
-| [PROJECT_AUDIT.md](PROJECT_AUDIT.md) | Source-project comparison and later migration recommendations |
-| [TODO.md](TODO.md) | Original preferences and outstanding tooling choices |
+| [ts/configs/README.md](ts/configs/README.md) | Shared configs and adoption commands |
+| [ts/skills/](ts/skills/) | Six curated skills with supporting references and task-specific guidance |
 
 ## Adopt in a project
 
@@ -28,40 +26,6 @@ These files are maintained here. Storing them in this repository does not activa
 them in other projects. When using a copy, record its source revision so updates
 can be reviewed deliberately.
 
-## Decisions in these migrations
-
-- Stateless OOP follows `TODO.md`, replacing the functions-first default in the
-  audited generic rules. Classes group cohesive domain behavior; React keeps its
-  function-based APIs. Shared services keep per-call data out of instance fields.
-- `ui/`, `fixture/`, and `feature/` express different ownership boundaries. Existing
-  project layouts can keep their own names.
-- TSX files may contain one large cohesive component or a few small related ones.
-- Tests target behavior, edge cases, and regressions. Verification should use the
-  existing runner and report actual results.
-- Biome uses Ultracite core with explicit allowances for static-only classes and
-  constructor parameter properties. The TypeScript base shares strict checks;
-  each consumer chooses its platform globals, modules, and output settings.
-- Skills are selected per task and stack. Complete folders are stored with
-  their supporting resources; local scope notes keep upstream examples
-  aligned with project versions and personal conventions.
-- Stack profiles keep browser, Bun, Workers, Electron, and Expo environments
-  explicit. Framework config and optional dependencies stay project-specific.
-
-The configs passed formatting/linting, type checking, a declaration build, and all
-160 existing tests in an isolated copy of `1git/packages/git`. Full commands and
-tested versions are in the [config guide](ts/configs/README.md).
-
-## Next migrations
-
-Steps 1–4 are complete: personal guides, shared configs, curated skills, and
-optional stack profiles. Step 5 is an optional Bun/TypeScript installer, useful
-when manual adoption reveals repeated work.
-The exact shared `cn` package and `shadcn/lint` integration
-from `TODO.md` still need to be selected and verified before becoming executable
-configuration. The React guide uses the existing project's class-merging entry
-point during ordinary UI work.
-
-The baseline is adapted from the ownership, typing, and verification guidance in
-`altavinci/RULES-GENERIC.md` and `daydb`'s regression-testing skill. The React guide
-is adapted from section 11 of `1git/RULES-GENERIC.md`. See the audit for local
-source links and the rationale for each selection.
+Select skills by task and copy complete folders with their supporting resources.
+Keep runtime requirements, installed versions, and validation commands explicit
+in the target project's instructions.
