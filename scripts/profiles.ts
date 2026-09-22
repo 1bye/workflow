@@ -16,6 +16,8 @@ export const profiles = {
 } as const;
 
 export const skills = [
+  "bro",
+  "unslop",
   "tdd",
   "ultracite",
   "turborepo",

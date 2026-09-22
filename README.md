@@ -6,9 +6,10 @@ Personal TypeScript conventions and reusable instructions for AI coding agents.
 | --- | --- |
 | [ts/AGENTS.md](ts/AGENTS.md) | General TypeScript coding and verification defaults |
 | [ts/react.md](ts/react.md) | React component ownership, UI organization, state, and styling |
+| [ts/testing.md](ts/testing.md) | Test categories, file summaries, dependency boundaries, and suite organization |
 | [ts/stacks.md](ts/stacks.md) | Optional web, API, desktop, mobile, library/CLI, and workspace profiles |
 | [ts/configs/README.md](ts/configs/README.md) | Shared configs and adoption commands |
-| [ts/skills/](ts/skills/) | Six curated skills with supporting references and task-specific guidance |
+| [ts/skills/](ts/skills/) | Curated skills with supporting references and task-specific guidance |
 | [scripts/install.ts](scripts/install.ts) | Bun installer with previews, profile selection, and conflict checks |
 
 ## Install in a project
@@ -37,14 +38,19 @@ bun run scripts/install.ts ../my-app
 | `mobile` | `vercel-composition-patterns` |
 | `workspace` | `turborepo` |
 
-Use `--skills` for additional skills: `tdd`, `ultracite`, `turborepo`,
-`vercel-react-best-practices`, `vercel-composition-patterns`, or `shadcn`.
+Use `--skills` for additional skills: `bro`, `unslop`, `tdd`, `ultracite`,
+`turborepo`, `vercel-react-best-practices`, `vercel-composition-patterns`, or `shadcn`.
 Comma-separated and repeated `--profile`/`--skills` flags are supported.
 An explicit flag replaces that selection; omitted flags retain the last install.
 `--skills none` clears extra skills while retaining profile defaults.
 
-The installer copies the TypeScript baseline, React companion, selected stack
-sections, and config reference files into `.agents/workflow/`. Skills are copied
+`bro` restates the last response plainly. `unslop` edits writing to remove filler,
+stock AI phrasing, and jargon. Both retain explicit invocation: after installation,
+use `$bro` or `$unslop` when needed. For example, add them with
+`--skills bro,unslop`, alongside any other extra skills you want to retain.
+
+The installer copies the TypeScript baseline, React and testing guides, selected
+stack sections, and config reference files into `.agents/workflow/`. Skills are copied
 in full into `.agents/skills/`. A marked block in root `AGENTS.md` directs agents
 to the guides; existing project instructions outside that block are preserved.
 Relative links are adjusted for the installed layout. Unselected skill references

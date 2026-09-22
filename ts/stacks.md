@@ -192,6 +192,10 @@ adopted. [TDD](skills/tdd/SKILL.md) retains explicit invocation for a requested
 regression workflow; ordinary behavior tests still follow the baseline. Select
 the other skills by the relevant profile and task.
 
+[Bro](skills/bro/SKILL.md) restates the last response in plain language.
+[Unslop](skills/unslop/SKILL.md) edits writing to remove filler and stock AI
+phrasing while preserving meaning. Both are optional, explicitly invoked skills.
+
 Effect, Drizzle/database drivers, Better Auth, Alchemy, and AI frameworks remain
 explicit project choices. Inspect installed versions and runtime compatibility
 before using their APIs. Match the installed major version and avoid dependency

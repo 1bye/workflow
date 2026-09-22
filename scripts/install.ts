@@ -21,6 +21,7 @@ const end = "<!-- workflow:end -->";
 const guideFiles = [
   "AGENTS.md",
   "react.md",
+  "testing.md",
   "stacks.md",
   "configs/README.md",
   "configs/biome.json",

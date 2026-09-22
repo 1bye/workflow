@@ -56,7 +56,38 @@ this guide. For React or TSX work, also read `react.md` beside this file.
   background-task mechanism with error handling and a defined lifetime.
 - Choose suitable algorithms and avoid obvious repeated work. Add caches,
   memoization, or pooling for a concrete cost, with clear lifetime/invalidation.
-- Comments explain contracts, invariants, and non-obvious decisions.
+
+## Comments and documentation
+
+- Add concise JSDoc immediately above exported domain concepts, contracts,
+  schemas, errors, services, and configuration factories. Document public setup
+  methods when their resource ownership or lifetime needs explanation.
+- Explain purpose and intended consumer in one to three sentences. Explain usage
+  when the signature is insufficient; add a short `@example` only for non-obvious
+  usage. Comments should clarify contracts, invariants, and decisions.
+- Document meaningful boundaries: validated data versus authenticated identity,
+  server-only configuration, resource ownership/lifetime, and failure behavior.
+  A schema validates data; it does not authenticate a caller or grant permission.
+- Distinguish active consumers from planned usage. Do not describe an unwired
+  schema or service as a working feature.
+- Do not repeat TypeScript types, list every current caller, or add boilerplate
+  comments to trivial private helpers. Update comments when behavior changes.
+- Leave generated schemas untouched. Document their purpose and regeneration
+  command beside the generator; do not maintain generated per-field JSDoc.
+- Review comment usefulness rather than adding a blanket comment-presence rule.
+
+## Logical spacing
+
+- Separate logical phases with one blank line: configuration, validation,
+  execution, and results.
+- Keep closely related short declarations together. Separate multiline
+  declarations from subsequent operations or control flow.
+- Add a blank line before a return after other work. Do not pad a short guard
+  clause or the edges of a block.
+- Keep pipelines, argument lists, and object definitions cohesive. Do not add
+  blank lines between every statement or property.
+- Apply logical grouping while writing or refactoring. The formatter does not
+  decide which operations belong together.
 
 ## Tooling and verification
 
@@ -66,6 +97,9 @@ this guide. For React or TSX work, also read `react.md` beside this file.
   formatter until a formatting migration is explicitly part of the task.
 - Use the installed library version's documentation and types. Keep Effect,
   frameworks, databases, and monorepo tooling project choices, not requirements.
+- Follow [the testing guide](testing.md) for test categories, file summaries,
+  dependency boundaries, and suite organization. Preserve an existing project's
+  layout unless a testing migration is part of the task.
 - Test nontrivial behavior, meaningful edge/failure cases, and fixed regressions
   using the existing runner. For a practical regression test, demonstrate the
   intended failure before the fix and a pass afterward.

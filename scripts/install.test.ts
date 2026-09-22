@@ -1,3 +1,9 @@
+/**
+ * Covers: previews, installation, updates, conflicts, and managed path boundaries.
+ * Real: installer, CLI, source templates, skill resources, and temporary files.
+ * Doubles: none; scenarios use isolated source copies and temporary projects.
+ * Requires: Bun and a writable temporary directory; no network or external service.
+ */
 import { afterEach, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import {
@@ -71,7 +77,7 @@ test("CLI previews without creating anything, including for a target with spaces
       "--profile",
       "web",
       "--skills",
-      "shadcn",
+      "shadcn,bro,unslop",
       "--dry-run",
     ],
     { cwd: tmpdir() },
@@ -79,6 +85,8 @@ test("CLI previews without creating anything, including for a target with spaces
   expect(result.exitCode).toBe(0);
   expect(result.stdout.toString()).toContain("Preview only");
   expect(result.stdout.toString()).toContain("shadcn/assets/shadcn.png");
+  expect(result.stdout.toString()).toContain("bro/agents/openai.yaml");
+  expect(result.stdout.toString()).toContain("unslop/agents/openai.yaml");
   expect(snapshot(target)).toEqual(before);
   expect(existsSync(join(target, ".agents"))).toBe(false);
 });
@@ -88,18 +96,27 @@ test("installs whole skills, preserves project instructions, and keeps all refer
   const original = "# Application\n\nUse the existing test runner.\n";
   writeFileSync(join(options.target, "AGENTS.md"), original);
   WorkflowInstaller.apply(
-    WorkflowInstaller.plan({ ...options, profiles: ["web"], skills: ["shadcn"] }),
+    WorkflowInstaller.plan({ ...options, profiles: ["web"], skills: ["shadcn", "bro", "unslop"] }),
   );
   const instructions = readFileSync(join(options.target, "AGENTS.md"), "utf8");
   expect(instructions.startsWith(original)).toBe(true);
   expect(instructions).toContain(".agents/workflow/AGENTS.md");
-  for (const name of ["shadcn", "vercel-react-best-practices", "vercel-composition-patterns"]) {
+  for (const name of [
+    "shadcn",
+    "bro",
+    "unslop",
+    "vercel-react-best-practices",
+    "vercel-composition-patterns",
+  ]) {
     expect(snapshot(join(options.target, ".agents/skills", name))).toEqual(
       snapshot(join(options.source, "ts/skills", name)),
     );
   }
   expect(existsSync(join(options.target, ".agents/skills/turborepo"))).toBe(false);
   expect(existsSync(join(options.target, "biome.json"))).toBe(false);
+  expect(readFileSync(join(options.target, ".agents/workflow/testing.md"))).toEqual(
+    readFileSync(join(options.source, "ts/testing.md")),
+  );
   checkLinks(options.target);
 });
 
