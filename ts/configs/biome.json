@@ -1,0 +1,23 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "extends": ["ultracite/biome/core"],
+  "formatter": {
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineEnding": "lf"
+  },
+  "linter": {
+    "rules": {
+      "complexity": {
+        "noStaticOnlyClass": "off"
+      },
+      "style": {
+        "noParameterProperties": "off"
+      }
+    }
+  },
+  "vcs": {
+    "enabled": false,
+    "useIgnoreFile": false
+  }
+}
