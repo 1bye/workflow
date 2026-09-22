@@ -7,6 +7,7 @@ Personal TypeScript conventions and reusable instructions for AI coding agents.
 | [ts/AGENTS.md](ts/AGENTS.md) | General TypeScript coding and verification defaults |
 | [ts/react.md](ts/react.md) | React component ownership, UI organization, state, and styling |
 | [ts/configs/README.md](ts/configs/README.md) | Shared configs, adoption commands, and validation results |
+| [ts/skills/README.md](ts/skills/README.md) | Six curated skills, source snapshots, local edits, and compatibility notes |
 | [PROJECT_AUDIT.md](PROJECT_AUDIT.md) | Source-project comparison and later migration recommendations |
 | [TODO.md](TODO.md) | Original preferences and outstanding tooling choices |
 
@@ -37,6 +38,9 @@ can be reviewed deliberately.
 - Biome uses Ultracite core with explicit allowances for static-only classes and
   constructor parameter properties. The TypeScript base shares strict checks;
   each consumer chooses its platform globals, modules, and output settings.
+- Skills are selected per task and stack. Complete folders are stored with
+  provenance and content hashes; local scope notes keep upstream examples
+  aligned with project versions and personal conventions.
 
 The configs passed formatting/linting, type checking, a declaration build, and all
 160 existing tests in an isolated copy of `1git/packages/git`. Full commands and
@@ -44,8 +48,9 @@ tested versions are in the [config guide](ts/configs/README.md).
 
 ## Next migrations
 
-Steps 1 and 2 are complete. Selected skill directories and stack profiles are next;
-an installer remains optional. The exact shared `cn` package and `shadcn/lint` integration
+Steps 1–3 are complete: personal guides, shared configs, and the curated skill
+catalog. Step 4 is optional stack profiles; step 5 is an optional installer.
+The exact shared `cn` package and `shadcn/lint` integration
 from `TODO.md` still need to be selected and verified before becoming executable
 configuration. The React guide uses the existing project's class-merging entry
 point during ordinary UI work.
