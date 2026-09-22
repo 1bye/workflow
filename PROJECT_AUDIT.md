@@ -4,7 +4,7 @@ Reviewed on 2026-09-16. Source: local projects under `/Users/yuriihulyk/Document
 
 The best starting point is a small set of your own TypeScript and React rules, a few reusable tool configs, and a catalog of optional skills. Your strongest personal conventions are in `RULES-GENERIC.md`, especially the expanded UI section in `1git`. Most root `AGENTS.md` files are copies of the same Ultracite preset and contribute little project-specific guidance.
 
-This report records the pre-migration review and proposals. Steps 1–3 are now implemented: the TypeScript/React guides, shared configs validated in an isolated copy of `1git/packages/git`, and a [six-skill catalog](ts/skills/README.md) with complete folders, source hashes, and local adaptations. See [README.md](README.md) for adoption and the selected defaults. `TODO.md` retains the original notes. Stack profiles and an optional installer remain later steps.
+This report records the pre-migration review and proposals. Steps 1–4 are now implemented: the TypeScript/React guides, shared configs validated in an isolated copy of `1git/packages/git`, [six curated skills](ts/skills/) with complete folders and local adaptations, and [optional stack profiles](ts/stacks.md). See [README.md](README.md) for adoption and the selected defaults. `TODO.md` retains the original notes. The optional installer remains step 5.
 
 ## Scope and evidence
 
@@ -163,6 +163,10 @@ Additional material outside that canonical count:
 Most framework skills are upstream material, not personal policy. The existing lockfiles identify sources including `vercel/turborepo`, `haydenbleasel/ultracite`, `vercel-labs/agent-skills`, `shadcn/ui`, `Effect-TS/skills`, `expo/skills`, `better-auth/skills`, `elysiajs/skills`, `neondatabase/agent-skills`, and `yusukebe/hono-skill`. Keep those origins and licenses when curating them. For locally modified or untracked skills, record that provenance is incomplete rather than inventing an upstream identity.
 
 ## Proposed stack profiles
+
+Implemented guidance is now in [ts/stacks.md](ts/stacks.md), including runtime
+boundaries, skill selection, config adoption, and package-specific checks. The
+table below preserves the original audit recommendations.
 
 These are proposals based on your local projects, not claims that one framework is universally preferable.
 

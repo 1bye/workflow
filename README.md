@@ -6,8 +6,9 @@ Personal TypeScript conventions and reusable instructions for AI coding agents.
 | --- | --- |
 | [ts/AGENTS.md](ts/AGENTS.md) | General TypeScript coding and verification defaults |
 | [ts/react.md](ts/react.md) | React component ownership, UI organization, state, and styling |
+| [ts/stacks.md](ts/stacks.md) | Optional web, API, desktop, mobile, library/CLI, and workspace profiles |
 | [ts/configs/README.md](ts/configs/README.md) | Shared configs, adoption commands, and validation results |
-| [ts/skills/README.md](ts/skills/README.md) | Six curated skills, source snapshots, local edits, and compatibility notes |
+| [ts/skills/](ts/skills/) | Six curated skills with supporting references and local scope notes |
 | [PROJECT_AUDIT.md](PROJECT_AUDIT.md) | Source-project comparison and later migration recommendations |
 | [TODO.md](TODO.md) | Original preferences and outstanding tooling choices |
 
@@ -18,7 +19,9 @@ Personal TypeScript conventions and reusable instructions for AI coding agents.
    commands, runtime requirements, and architectural exceptions.
 3. For React work, include the companion guide and an explicit instruction to read
    it. Keep its path correct relative to the adopted baseline.
-4. Have the agent identify the instructions it loaded and the actual validation
+4. Select the relevant [stack profile](ts/stacks.md) for each app/package and merge
+   its runtime boundaries and check commands into the project's instructions.
+5. Have the agent identify the instructions it loaded and the actual validation
    commands before using the setup for a change.
 
 These files are maintained here. Storing them in this repository does not activate
@@ -39,8 +42,10 @@ can be reviewed deliberately.
   constructor parameter properties. The TypeScript base shares strict checks;
   each consumer chooses its platform globals, modules, and output settings.
 - Skills are selected per task and stack. Complete folders are stored with
-  provenance and content hashes; local scope notes keep upstream examples
+  their supporting resources; local scope notes keep upstream examples
   aligned with project versions and personal conventions.
+- Stack profiles keep browser, Bun, Workers, Electron, and Expo environments
+  explicit. Framework config and optional dependencies stay project-specific.
 
 The configs passed formatting/linting, type checking, a declaration build, and all
 160 existing tests in an isolated copy of `1git/packages/git`. Full commands and
@@ -48,8 +53,9 @@ tested versions are in the [config guide](ts/configs/README.md).
 
 ## Next migrations
 
-Steps 1–3 are complete: personal guides, shared configs, and the curated skill
-catalog. Step 4 is optional stack profiles; step 5 is an optional installer.
+Steps 1–4 are complete: personal guides, shared configs, curated skills, and
+optional stack profiles. Step 5 is an optional Bun/TypeScript installer, useful
+when manual adoption reveals repeated work.
 The exact shared `cn` package and `shadcn/lint` integration
 from `TODO.md` still need to be selected and verified before becoming executable
 configuration. The React guide uses the existing project's class-merging entry
