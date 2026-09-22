@@ -1,0 +1,13 @@
+{
+  "name": "personal-agent-workflow",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "bun test scripts",
+    "check-types": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "1.3.5",
+    "typescript": "6.0.3"
+  }
+}
