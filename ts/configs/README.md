@@ -1,7 +1,8 @@
 # Shared TypeScript configs
 
 These are copyable starting configs. They need the consuming project's installed
-tools; `workflow` itself has no package install or automatic synchronization.
+tools. The workflow installer can copy the root templates with `--configs`;
+dependency installation and runtime-specific configuration remain explicit.
 
 | File | Purpose |
 | --- | --- |
