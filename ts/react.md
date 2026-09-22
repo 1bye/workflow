@@ -65,9 +65,10 @@ Create only directories and files the feature needs.
   dynamic values where they are clearer.
 - Follow configured formatting, class sorting, and lint rules. Adding a shared
   `cn` package or a new lint integration is a deliberate tooling change.
-- When setting up shared tooling, identify and verify the intended `cn` package
-  and `shadcn/lint` integration before configuring them. Use the project's
-  established helper and lint rules until those choices are resolved.
+- For Tailwind v4 projects adopting design-system linting, use the optional
+  [combined Oxlint config](configs/README.md#oxlint-spacing-and-shadcn). Keep component
+  discovery, theme paths, and overrides aligned with the actual project. Preserve
+  the established `cn` helper; adopting lint rules does not require replacing it.
 
 ## Interaction and verification
 

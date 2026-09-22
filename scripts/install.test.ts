@@ -38,6 +38,7 @@ function fixture() {
   const target = join(root, "target project");
   mkdirSync(target);
   cpSync(join(repository, "ts"), join(source, "ts"), { recursive: true });
+
   return { root, source, target };
 }
 
@@ -50,7 +51,9 @@ function snapshot(root: string): Record<string, string> {
       else if (entry.isFile()) files[child] = readFileSync(join(root, child)).toString("base64");
     }
   };
+
   visit("");
+
   return files;
 }
 
@@ -78,15 +81,18 @@ test("CLI previews without creating anything, including for a target with spaces
       "web",
       "--skills",
       "shadcn,bro,unslop",
+      "--oxlint",
       "--dry-run",
     ],
     { cwd: tmpdir() },
   );
+
   expect(result.exitCode).toBe(0);
   expect(result.stdout.toString()).toContain("Preview only");
   expect(result.stdout.toString()).toContain("shadcn/assets/shadcn.png");
   expect(result.stdout.toString()).toContain("bro/agents/openai.yaml");
   expect(result.stdout.toString()).toContain("unslop/agents/openai.yaml");
+  expect(result.stdout.toString()).toContain(".oxlintrc.json");
   expect(snapshot(target)).toEqual(before);
   expect(existsSync(join(target, ".agents"))).toBe(false);
 });
@@ -114,6 +120,7 @@ test("installs whole skills, preserves project instructions, and keeps all refer
   }
   expect(existsSync(join(options.target, ".agents/skills/turborepo"))).toBe(false);
   expect(existsSync(join(options.target, "biome.json"))).toBe(false);
+  expect(existsSync(join(options.target, ".oxlintrc.json"))).toBe(false);
   expect(readFileSync(join(options.target, ".agents/workflow/testing.md"))).toEqual(
     readFileSync(join(options.source, "ts/testing.md")),
   );
@@ -232,6 +239,67 @@ test("copies requested root templates without changing the application's tsconfi
   expect(readFileSync(join(options.target, "tsconfig.json"), "utf8")).toBe(
     '{"extends":"expo/tsconfig.base"}\n',
   );
+});
+
+test.each([
+  ".oxlintrc.json",
+  ".oxlintrc.jsonc",
+  "oxlint.config.ts",
+  "oxlint.config.mts",
+])("Oxlint adoption preserves existing %s before any writes", (name) => {
+  const options = fixture();
+  writeFileSync(join(options.target, name), "Local config\n");
+  WorkflowInstaller.apply(WorkflowInstaller.plan(options));
+  const before = snapshot(options.target);
+
+  const plan = WorkflowInstaller.plan({ ...options, oxlint: true });
+
+  expect(plan.changes.find((change) => change.path === name)?.status).toBe("conflict");
+  expect(() => WorkflowInstaller.apply(plan)).toThrow("no files were written");
+  expect(snapshot(options.target)).toEqual(before);
+});
+
+test("combined Oxlint config is copied in full, retained, and removable", () => {
+  const options = fixture();
+  const rootConfig = join(options.target, ".oxlintrc.json");
+  WorkflowInstaller.apply(WorkflowInstaller.plan({ ...options, oxlint: true }));
+  expect(readFileSync(rootConfig)).toEqual(
+    readFileSync(join(options.source, "ts/configs/oxlint.json")),
+  );
+  expect(
+    WorkflowInstaller.plan(options).changes.every(({ status }) => status === "unchanged"),
+  ).toBe(true);
+
+  WorkflowInstaller.apply(WorkflowInstaller.plan({ ...options, oxlint: false }));
+  expect(existsSync(rootConfig)).toBe(false);
+  expect(existsSync(join(options.target, ".agents/workflow/configs/oxlint.json"))).toBe(true);
+});
+
+test("Oxlint changes and removal never overwrite local edits", () => {
+  const options = fixture();
+  WorkflowInstaller.apply(WorkflowInstaller.plan({ ...options, oxlint: true }));
+  writeFileSync(join(options.target, ".oxlintrc.json"), '{"rules":{}}\n');
+  const before = snapshot(options.target);
+
+  for (const oxlint of [true, false]) {
+    expect(() => WorkflowInstaller.apply(WorkflowInstaller.plan({ ...options, oxlint }))).toThrow();
+    expect(snapshot(options.target)).toEqual(before);
+  }
+});
+
+test("existing install records without Oxlint remain valid and do not activate it", () => {
+  const options = fixture();
+  WorkflowInstaller.apply(WorkflowInstaller.plan(options));
+  const path = join(options.target, ".agents/workflow/install.json");
+  const record = JSON.parse(readFileSync(path, "utf8"));
+  delete record.oxlint;
+  writeFileSync(path, JSON.stringify(record));
+
+  WorkflowInstaller.apply(WorkflowInstaller.plan(options));
+
+  expect(existsSync(join(options.target, ".oxlintrc.json"))).toBe(false);
+  writeFileSync(path, JSON.stringify({ ...record, oxlint: "unknown" }));
+  expect(() => WorkflowInstaller.plan(options)).toThrow("Invalid or unsupported install record");
 });
 
 test("changing profiles removes obsolete managed skills while preserving unrelated files", () => {
@@ -376,8 +444,17 @@ test("CLI rejects unknown options and conflicts, and can clear extra skills", ()
       options.target,
       ...args,
     ]);
+
   expect(cli(["--unknown"]).exitCode).toBe(1);
+  expect(cli(["--oxlint", "unknown"]).exitCode).toBe(1);
   expect(cli(["--profile", "library", "--skills", "tdd"]).exitCode).toBe(0);
+  expect(cli(["--oxlint", "--no-oxlint"]).exitCode).toBe(1);
+  expect(cli(["--oxlint"]).exitCode).toBe(0);
+  expect(readFileSync(join(options.target, ".oxlintrc.json"))).toEqual(
+    readFileSync(join(repository, "ts/configs/oxlint.json")),
+  );
+  expect(cli(["--no-oxlint"]).exitCode).toBe(0);
+  expect(existsSync(join(options.target, ".oxlintrc.json"))).toBe(false);
   expect(cli(["--skills", "none"]).exitCode).toBe(0);
   expect(existsSync(join(options.target, ".agents/skills/tdd/SKILL.md"))).toBe(false);
   writeFileSync(join(options.target, ".agents/workflow/react.md"), "Local edits");

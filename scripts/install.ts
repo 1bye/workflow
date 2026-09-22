@@ -26,6 +26,7 @@ const guideFiles = [
   "configs/README.md",
   "configs/biome.json",
   "configs/tsconfig.base.json",
+  "configs/oxlint.json",
 ];
 
 type InstallRecord = {
@@ -33,6 +34,7 @@ type InstallRecord = {
   profiles: Profile[];
   extraSkills: Skill[];
   configs: boolean;
+  oxlint?: boolean;
   files: Record<string, string>;
   agentsBlockHash: string;
 };
@@ -43,6 +45,7 @@ type Options = {
   profiles?: string[];
   skills?: string[];
   configs?: boolean;
+  oxlint?: boolean;
 };
 
 type Change = {
@@ -61,8 +64,9 @@ export class WorkflowInstaller {
   }
 
   private static isManagedPath(path: string): boolean {
-    if (["biome.json", "tsconfig.base.json"].includes(path)) return true;
+    if (["biome.json", "tsconfig.base.json", ".oxlintrc.json"].includes(path)) return true;
     if (guideFiles.some((name) => path === `${bundle}/${name}`)) return true;
+
     return (
       skills.some((name) => path.startsWith(`.agents/skills/${name}/`)) &&
       path.split("/").every((part) => part !== "" && part !== "." && part !== "..") &&
@@ -90,6 +94,7 @@ export class WorkflowInstaller {
       if (index === parts.length - 1 && !stat.isFile())
         throw new Error(`Not a regular file: ${path}`);
     }
+
     return readFileSync(resolve(root, path));
   }
 
@@ -101,6 +106,7 @@ export class WorkflowInstaller {
     if (values.some((value) => !allowed.includes(value as T))) {
       throw new Error(`Unknown ${label}. Choose from: ${allowed.join(", ")}`);
     }
+
     return [...new Set(values)] as T[];
   }
 
@@ -116,6 +122,7 @@ export class WorkflowInstaller {
       !record.profiles.length ||
       !Array.isArray(record.extraSkills) ||
       typeof record.configs !== "boolean" ||
+      (record.oxlint !== undefined && typeof record.oxlint !== "boolean") ||
       !record.files ||
       typeof record.files !== "object" ||
       Array.isArray(record.files) ||
@@ -139,6 +146,7 @@ export class WorkflowInstaller {
         throw new Error(`Invalid install record entry: ${path}`);
       }
     }
+
     return record as InstallRecord;
   }
 
@@ -152,22 +160,28 @@ export class WorkflowInstaller {
         .slice(1)
         .map((section) => {
           const title = section.split("\n", 1)[0]?.slice(3);
+
           return [title, section.trim()] as const;
         }),
     );
+
     const titles = [
       "Apply a profile",
       ...selected.flatMap((name) => profiles[name].section ?? []),
       "Common skills and optional dependencies",
     ];
+
     const body = [...new Set(titles)]
       .map((title) => {
         const section = sections.get(title);
         if (!section) throw new Error(`Missing stack section: ${title}`);
+
         return section;
       })
       .join("\n\n");
+
     const guide = `# Installed TypeScript profiles\n\nSelected: ${selected.join(", ")}.\n\nUse [the baseline](AGENTS.md), [React guidance](react.md) where applicable,\nand [config guidance](configs/README.md).\n\n${body}\n`;
+
     return Buffer.from(
       guide.replace(
         /\[([^\]]+)\]\(skills\/([^/]+)\/SKILL\.md\)/g,
@@ -186,8 +200,10 @@ export class WorkflowInstaller {
       throw new Error("Target must be an existing project directory");
     const contains = (parent: string, child: string) => {
       const path = relative(parent, child);
+
       return path === "" || (!isAbsolute(path) && path !== ".." && !path.startsWith(`..${sep}`));
     };
+
     if (contains(source, target) || contains(target, source))
       throw new Error("Source and target directories must not overlap");
 
@@ -197,17 +213,22 @@ export class WorkflowInstaller {
       Object.keys(profiles) as Profile[],
       "profile",
     );
+
     if (!selected.length) throw new Error("Choose at least one profile");
     const extras = WorkflowInstaller.selection(
       options.skills ?? previous?.extraSkills ?? [],
       skills,
       "skill",
     );
+
     const installed = new Set<string>([
       ...selected.flatMap((name) => [...profiles[name].skills]),
       ...extras,
     ]);
+
     const configs = options.configs ?? previous?.configs ?? false;
+    const oxlint = options.oxlint ?? previous?.oxlint ?? false;
+
     const desired = new Map<string, Buffer>();
     for (const name of guideFiles) {
       const content = WorkflowInstaller.read(source, `ts/${name}`);
@@ -230,6 +251,7 @@ export class WorkflowInstaller {
         desired.set(path.replace(/^ts\/skills\//, ".agents/skills/"), content);
       }
     };
+
     for (const skill of [...installed].sort()) {
       if (!WorkflowInstaller.read(source, `ts/skills/${skill}/SKILL.md`))
         throw new Error(`Missing skill: ${skill}`);
@@ -241,6 +263,11 @@ export class WorkflowInstaller {
         if (!template) throw new Error(`Missing config template: ${name}`);
         desired.set(name, template);
       }
+    }
+    if (oxlint) {
+      const template = desired.get(`${bundle}/configs/oxlint.json`);
+      if (!template) throw new Error("Missing Oxlint config template");
+      desired.set(".oxlintrc.json", template);
     }
 
     const changes: Change[] = [];
@@ -265,18 +292,24 @@ export class WorkflowInstaller {
         if (after?.equals(before)) return { ...result, status: "unchanged" };
         if (WorkflowInstaller.hash(before) !== oldHash)
           return { ...result, status: "conflict", reason: "Managed file has local edits" };
+
         return { ...result, status: after ? "update" : "remove" };
       } catch (error) {
         return { path, before: null, after, status: "conflict", reason: String(error) };
       }
     };
+
     for (const [path, content] of desired) changes.push(fileChange(path, content));
     for (const path of Object.keys(previous?.files ?? {})) {
       if (!desired.has(path)) changes.push(fileChange(path, null));
     }
 
     // These siblings can supersede or conflict with the files we install.
-    for (const path of ["AGENTS.override.md", ...(configs ? ["biome.jsonc"] : [])]) {
+    for (const path of [
+      "AGENTS.override.md",
+      ...(configs ? ["biome.jsonc"] : []),
+      ...(oxlint ? [".oxlintrc.jsonc", "oxlint.config.ts", "oxlint.config.mts"] : []),
+    ]) {
       const change = fileChange(path, null);
       if (change.before || change.status === "conflict") {
         changes.push({
@@ -296,6 +329,7 @@ export class WorkflowInstaller {
       "Preserve this project's specific instructions and existing tooling.",
       end,
     ].join("\n");
+
     let block = instructions;
     try {
       const before = WorkflowInstaller.read(target, "AGENTS.md");
@@ -345,11 +379,13 @@ export class WorkflowInstaller {
       profiles: selected,
       extraSkills: extras,
       configs,
+      oxlint,
       files: Object.fromEntries(
         [...desired].map(([path, content]) => [path, WorkflowInstaller.hash(content)]),
       ),
       agentsBlockHash: WorkflowInstaller.hash(block),
     };
+
     const before = WorkflowInstaller.read(target, recordPath);
     const after = Buffer.from(`${JSON.stringify(record, null, 2)}\n`);
     changes.push({
@@ -358,6 +394,7 @@ export class WorkflowInstaller {
       after,
       status: !before ? "add" : before.equals(after) ? "unchanged" : "update",
     });
+
     return { target, changes };
   }
 
@@ -401,26 +438,34 @@ if (import.meta.main) {
         profile: { type: "string", multiple: true },
         skills: { type: "string", multiple: true },
         configs: { type: "boolean" },
+        oxlint: { type: "boolean" },
+        "no-oxlint": { type: "boolean" },
         "dry-run": { type: "boolean" },
         help: { type: "boolean", short: "h" },
       },
     });
+
     if (values.help) {
       console.log(
-        `Usage: bun run scripts/install.ts <project> [options]\n\n--profile <names>  Comma-separated or repeated: ${Object.keys(profiles).join(", ")}\n--skills <names>   Extra skills: ${skills.join(", ")}\n--configs         Copy Biome and TypeScript base templates into the project root\n--dry-run         Preview without writing\n\nNew installs default to core. Omitted selections retain the last install.\nUse --skills none to clear extra skills. Profile changes remove unedited obsolete files.\nConflicts abort the entire install. No dependencies are installed.`,
+        `Usage: bun run scripts/install.ts <project> [options]\n\n--profile <names>  Comma-separated or repeated: ${Object.keys(profiles).join(", ")}\n--skills <names>   Extra skills: ${skills.join(", ")}\n--configs         Copy Biome and TypeScript base templates into the project root\n--oxlint          Install the combined spacing and shadcn lint config\n--no-oxlint       Remove the unedited managed root Oxlint config\n--dry-run         Preview without writing\n\nNew installs default to core. Omitted selections retain the last install.\nUse --skills none to clear extra skills. Profile changes remove unedited obsolete files.\nConflicts abort the entire install. No dependencies are installed.`,
       );
     } else {
       if (positionals.length !== 1 || !positionals[0])
         throw new Error("Provide one existing project directory; use --help for options");
       const split = (items?: string[]) =>
         items?.flatMap((item) => item.split(",").map((part) => part.trim()));
+
+      if (values.oxlint && values["no-oxlint"])
+        throw new Error("Choose either --oxlint or --no-oxlint");
       const extras = split(values.skills);
       const plan = WorkflowInstaller.plan({
         target: positionals[0],
         profiles: split(values.profile),
         skills: extras?.length === 1 && extras[0] === "none" ? [] : extras,
         configs: values.configs,
+        oxlint: values["no-oxlint"] ? false : values.oxlint,
       });
+
       for (const change of plan.changes) {
         if (change.status !== "unchanged" || change.after !== null)
           console.log(
@@ -434,7 +479,7 @@ if (import.meta.main) {
       else {
         WorkflowInstaller.apply(plan);
         console.log(
-          `Installed in ${plan.target}. Review the diff and verify agent discovery.${values.configs ? " Root config templates need their documented dependencies and runtime-specific setup." : ""}`,
+          `Installed in ${plan.target}. Review the diff and verify agent discovery.${values.configs || values.oxlint ? " Root config templates need their documented dependencies and runtime-specific setup." : ""}`,
         );
       }
     }

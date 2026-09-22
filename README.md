@@ -29,6 +29,9 @@ bun run scripts/install.ts ../my-app --profile web,workspace --skills shadcn,tdd
 
 # Update using the recorded selection after updating this checkout.
 bun run scripts/install.ts ../my-app
+
+# Add optional Oxlint checks to an existing project.
+bun run scripts/install.ts ../my-app --oxlint --dry-run
 ```
 
 | Profile | Skills included by default |
@@ -63,6 +66,14 @@ or select runtime globals. Follow [the config guide](ts/configs/README.md) to ad
 the required dependencies and extend the base appropriately. Without `--configs`,
 the bundled config files remain reference templates under `.agents/workflow/`.
 
+Use `--oxlint` to install one combined config with blank-line rules and shadcn
+design-system checks. This copies the complete config into root `.oxlintrc.json`.
+It works independently of `--configs` and preserves the existing Biome setup.
+Omission retains the choice; `--no-oxlint` removes an unedited managed root config.
+Existing Oxlint configs are conflicts.
+Install the documented dependencies and add lint scripts explicitly; see the
+[Oxlint guide](ts/configs/README.md#oxlint-spacing-and-shadcn).
+
 `.agents/workflow/install.json` records the selections and hashes of managed
 files and the instruction block. Commit it with the installed files. Rerunning
 updates unchanged managed copies and removes obsolete managed files when a
@@ -87,11 +98,14 @@ loads. Use `--help` for the complete command syntax.
 ```sh
 bun install --frozen-lockfile
 bun run check-types
+bun run lint
 bun test
 ```
 
 Tests use temporary projects to cover profiles, complete skill copies, local
 links, previews, repeated installs, updates, conflicts, and path boundaries.
+Config tests run the real Oxlint plugins and Biome against temporary TypeScript
+and Tailwind examples, including the installed config layout.
 
 ## Adopt manually
 
