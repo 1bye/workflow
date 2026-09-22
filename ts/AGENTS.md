@@ -1,5 +1,11 @@
 # TypeScript defaults
 
+## Read first
+
+When executing long-running compilation or test tasks, do NOT poll the process
+using `write_stdin`. Wait for the terminal to yield naturally, or set an extended
+execution timeout.
+
 Use these defaults for TypeScript work. Follow the task's explicit requirements
 and the target project's more specific instructions. Preserve established
 architecture during focused changes; do not refactor unrelated code to match
