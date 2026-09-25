@@ -35,6 +35,7 @@ type InstallRecord = {
   extraSkills: Skill[];
   configs: boolean;
   oxlint?: boolean;
+  biome?: boolean;
   files: Record<string, string>;
   agentsBlockHash: string;
 };
@@ -46,6 +47,7 @@ type Options = {
   skills?: string[];
   configs?: boolean;
   oxlint?: boolean;
+  biome?: boolean;
 };
 
 type Change = {
@@ -123,6 +125,7 @@ export class WorkflowInstaller {
       !Array.isArray(record.extraSkills) ||
       typeof record.configs !== "boolean" ||
       (record.oxlint !== undefined && typeof record.oxlint !== "boolean") ||
+      (record.biome !== undefined && typeof record.biome !== "boolean") ||
       !record.files ||
       typeof record.files !== "object" ||
       Array.isArray(record.files) ||
@@ -150,7 +153,12 @@ export class WorkflowInstaller {
     return record as InstallRecord;
   }
 
-  private static stackGuide(source: string, selected: Profile[], installed: Set<string>): Buffer {
+  private static stackGuide(
+    source: string,
+    selected: Profile[],
+    installed: Set<string>,
+    biome: boolean,
+  ): Buffer {
     const text = WorkflowInstaller.read(source, "ts/stacks.md");
     if (!text) throw new Error("Missing source: ts/stacks.md");
     const sections = new Map(
@@ -171,7 +179,7 @@ export class WorkflowInstaller {
       "Common skills and optional dependencies",
     ];
 
-    const body = [...new Set(titles)]
+    let body = [...new Set(titles)]
       .map((title) => {
         const section = sections.get(title);
         if (!section) throw new Error(`Missing stack section: ${title}`);
@@ -179,6 +187,13 @@ export class WorkflowInstaller {
         return section;
       })
       .join("\n\n");
+
+    if (!biome) {
+      body = body.replace(
+        "[Ultracite](skills/ultracite/SKILL.md) applies where Ultracite is installed or being\nadopted. ",
+        "",
+      );
+    }
 
     const guide = `# Installed TypeScript profiles\n\nSelected: ${selected.join(", ")}.\n\nUse [the baseline](AGENTS.md), [React guidance](react.md) where applicable,\nand [config guidance](configs/README.md).\n\n${body}\n`;
 
@@ -228,14 +243,21 @@ export class WorkflowInstaller {
 
     const configs = options.configs ?? previous?.configs ?? false;
     const oxlint = options.oxlint ?? previous?.oxlint ?? false;
+    const biome = options.biome ?? previous?.biome ?? true;
+    if (!biome && configs) throw new Error("--configs requires Biome guidance");
 
     const desired = new Map<string, Buffer>();
     for (const name of guideFiles) {
-      const content = WorkflowInstaller.read(source, `ts/${name}`);
+      if (!biome && name === "configs/biome.json") continue;
+      const content = WorkflowInstaller.read(
+        source,
+        name === "configs/README.md" && !biome ? "ts/configs/oxc.md" : `ts/${name}`,
+      );
+
       if (!content) throw new Error(`Missing source: ts/${name}`);
       desired.set(
         `${bundle}/${name}`,
-        name === "stacks.md" ? WorkflowInstaller.stackGuide(source, selected, installed) : content,
+        name === "stacks.md" ? WorkflowInstaller.stackGuide(source, selected, installed, biome) : content,
       );
     }
     const copySkill = (path: string) => {
@@ -380,6 +402,7 @@ export class WorkflowInstaller {
       extraSkills: extras,
       configs,
       oxlint,
+      biome,
       files: Object.fromEntries(
         [...desired].map(([path, content]) => [path, WorkflowInstaller.hash(content)]),
       ),
@@ -440,6 +463,8 @@ if (import.meta.main) {
         configs: { type: "boolean" },
         oxlint: { type: "boolean" },
         "no-oxlint": { type: "boolean" },
+        biome: { type: "boolean" },
+        "no-biome": { type: "boolean" },
         "dry-run": { type: "boolean" },
         help: { type: "boolean", short: "h" },
       },
@@ -447,7 +472,7 @@ if (import.meta.main) {
 
     if (values.help) {
       console.log(
-        `Usage: bun run scripts/install.ts <project> [options]\n\n--profile <names>  Comma-separated or repeated: ${Object.keys(profiles).join(", ")}\n--skills <names>   Extra skills: ${skills.join(", ")}\n--configs         Copy Biome and TypeScript base templates into the project root\n--oxlint          Install the combined spacing and shadcn lint config\n--no-oxlint       Remove the unedited managed root Oxlint config\n--dry-run         Preview without writing\n\nNew installs default to core. Omitted selections retain the last install.\nUse --skills none to clear extra skills. Profile changes remove unedited obsolete files.\nConflicts abort the entire install. No dependencies are installed.`,
+        `Usage: bun run scripts/install.ts <project> [options]\n\n--profile <names>  Comma-separated or repeated: ${Object.keys(profiles).join(", ")}\n--skills <names>   Extra skills: ${skills.join(", ")}\n--configs         Copy Biome and TypeScript base templates into the project root\n--oxlint          Install the combined spacing and shadcn lint config\n--no-oxlint       Remove the unedited managed root Oxlint config\n--no-biome        Omit Biome-only reference guidance\n--biome           Restore Biome reference guidance\n--dry-run         Preview without writing\n\nNew installs default to core. Omitted selections retain the last install.\nUse --skills none to clear extra skills. Profile changes remove unedited obsolete files.\nConflicts abort the entire install. No dependencies are installed.`,
       );
     } else {
       if (positionals.length !== 1 || !positionals[0])
@@ -457,6 +482,8 @@ if (import.meta.main) {
 
       if (values.oxlint && values["no-oxlint"])
         throw new Error("Choose either --oxlint or --no-oxlint");
+      if (values.biome && values["no-biome"])
+        throw new Error("Choose either --biome or --no-biome");
       const extras = split(values.skills);
       const plan = WorkflowInstaller.plan({
         target: positionals[0],
@@ -464,6 +491,7 @@ if (import.meta.main) {
         skills: extras?.length === 1 && extras[0] === "none" ? [] : extras,
         configs: values.configs,
         oxlint: values["no-oxlint"] ? false : values.oxlint,
+        biome: values["no-biome"] ? false : values.biome,
       });
 
       for (const change of plan.changes) {

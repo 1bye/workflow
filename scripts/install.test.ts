@@ -302,6 +302,25 @@ test("existing install records without Oxlint remain valid and do not activate i
   expect(() => WorkflowInstaller.plan(options)).toThrow("Invalid or unsupported install record");
 });
 
+test("omits Biome references for projects using another formatter", () => {
+  const options = fixture();
+  WorkflowInstaller.apply(WorkflowInstaller.plan(options));
+  WorkflowInstaller.apply(WorkflowInstaller.plan({ ...options, biome: false }));
+
+  expect(existsSync(join(options.target, ".agents/workflow/configs/biome.json"))).toBe(false);
+  expect(readFileSync(join(options.target, ".agents/workflow/configs/README.md"), "utf8")).not.toContain("Biome");
+  const guide = readFileSync(join(options.target, ".agents/workflow/stacks.md"), "utf8");
+  expect(guide).not.toContain("Ultracite");
+  expect(guide).toContain("configs/README.md");
+  checkLinks(options.target);
+
+  expect(() => WorkflowInstaller.plan({ ...options, biome: false, configs: true })).toThrow(
+    "--configs requires Biome guidance",
+  );
+  WorkflowInstaller.apply(WorkflowInstaller.plan({ ...options, biome: true }));
+  expect(existsSync(join(options.target, ".agents/workflow/configs/biome.json"))).toBe(true);
+});
+
 test("changing profiles removes obsolete managed skills while preserving unrelated files", () => {
   const options = fixture();
   WorkflowInstaller.apply(WorkflowInstaller.plan({ ...options, profiles: ["web", "workspace"] }));

@@ -74,6 +74,12 @@ Existing Oxlint configs are conflicts.
 Install the documented dependencies and add lint scripts explicitly; see the
 [Oxlint guide](ts/configs/README.md#oxlint-spacing-and-shadcn).
 
+Use `--no-biome` when the project uses another formatter and linter. It omits
+the Biome template and Ultracite stack guidance, and installs Oxc config guidance
+in place of the Biome guide. `--biome` restores them. Root tool dependencies and scripts
+remain project-owned. `--no-biome` cannot be combined with `--configs`, which
+copies the Biome root template.
+
 `.agents/workflow/install.json` records the selections and hashes of managed
 files and the instruction block. Commit it with the installed files. Rerunning
 updates unchanged managed copies and removes obsolete managed files when a
