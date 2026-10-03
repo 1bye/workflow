@@ -30,7 +30,7 @@ bun run scripts/install.ts ../my-app --profile web,workspace --skills shadcn,tdd
 # Update using the recorded selection after updating this checkout.
 bun run scripts/install.ts ../my-app
 
-# Add optional Oxlint checks to an existing project.
+# Enable the default Oxlint checks on an older installation.
 bun run scripts/install.ts ../my-app --oxlint --dry-run
 ```
 
@@ -66,11 +66,13 @@ or select runtime globals. Follow [the config guide](ts/configs/README.md) to ad
 the required dependencies and extend the base appropriately. Without `--configs`,
 the bundled config files remain reference templates under `.agents/workflow/`.
 
-Use `--oxlint` to install one combined config with blank-line rules and shadcn
-design-system checks. This copies the complete config into root `.oxlintrc.json`.
-It works independently of `--configs` and preserves the existing Biome setup.
-Omission retains the choice; `--no-oxlint` removes an unedited managed root config.
-Existing Oxlint configs are conflicts.
+New installs copy the combined config with ESLint Stylistic blank-line rules and
+shadcn design-system checks into root `.oxlintrc.json` by default. This works
+independently of `--configs` and preserves the existing Biome setup. Existing
+installs retain their recorded choice; use `--oxlint` to enable it on an older
+install. `--no-oxlint` skips or removes an unedited managed root config.
+Existing Oxlint configs are conflicts: merge the spacing rules into a project-owned
+config and use `--no-oxlint` to keep the installer from managing that root file.
 Install the documented dependencies and add lint scripts explicitly; see the
 [Oxlint guide](ts/configs/README.md#oxlint-spacing-and-shadcn).
 

@@ -56,17 +56,24 @@ avoid running a second formatter over the same files.
 
 ## Oxlint spacing and shadcn
 
-`oxlint.json` contains both spacing and shadcn rules in one standalone config.
+`oxlint.json` contains both spacing and shadcn rules in one standalone config,
+installed as root `.oxlintrc.json` by default on new workflow installs.
 Oxlint's default correctness category is disabled so the existing Biome/Ultracite
 checks keep their role. This is an additional check, not a complete replacement
 for those checks.
 
-- Require a blank line before a return that follows other statements in its block.
-  A return at the start of a guard block remains compact.
-- Require a blank line after multiline `const`, `let`, or `var` declarations.
-  Short declarations can stay together. This also separates a multiline
-  declaration from a following declaration.
+- Require a blank line before `return` or `throw` after other statements in its
+  block. A return or throw at the start of a guard block remains compact.
+- Separate `if`, loops, `switch`, and `try` statements from surrounding statements.
+- Require a blank line after `const`, `let`, or `var` declaration groups. Consecutive
+  single-line declarations can stay together; multiline declarations are separated.
 - Allow at most one consecutive blank line and none at file/block edges.
+
+`@stylistic/padding-line-between-statements` inserts the structural gaps.
+`no-multiple-empty-lines` only removes excess gaps, and `padded-blocks` removes
+padding at block edges. Loading the plugin without enabling the padding rule will
+not add gaps. The copy under `.agents/workflow/configs/` is only a reference unless
+the root config imports it or includes its rules.
 
 The same config enables `shadcn/no-restyle`, `shadcn/no-raw-colors`, and
 `shadcn/no-unknown-classes` for Tailwind v4 design-system usage.
@@ -89,23 +96,25 @@ or later; using Bun as the package manager does not remove the plugins' Node
 requirements. Oxlint's JS plugin API is alpha, so keep the tested versions pinned
 and rerun the config checks when upgrading.
 
-From the workflow checkout, install the combined configuration:
+From the workflow checkout, install the default combined configuration:
 
 ```sh
-bun run scripts/install.ts ../my-app --oxlint --dry-run
-bun run scripts/install.ts ../my-app --oxlint
+bun run scripts/install.ts ../my-app --dry-run
+bun run scripts/install.ts ../my-app
 ```
 
 This copies the complete config into root `.oxlintrc.json`, with no preset chain.
-`--oxlint` is independent of `--configs` and skill selection.
-Omission retains the previous choice; `--no-oxlint` removes only an
-unedited managed root config. Existing JSON/JSONC/TypeScript Oxlint configs or
-local edits stop installation before writes. Dependencies and scripts are not
+Oxlint adoption is independent of `--configs` and skill selection. Existing installs
+retain their previous choice, including older records without Oxlint; use `--oxlint`
+to enable it. `--no-oxlint` skips or removes only an unedited managed root config.
+Existing JSON/JSONC/TypeScript Oxlint configs or local edits stop installation
+before writes. Dependencies and scripts are not
 installed or modified by the installer.
 
-For manual adoption, copy `oxlint.json` as root `.oxlintrc.json`, or merge its
-plugins, rules, and overrides into the existing root config. Standard shadcn
-projects use `components.json` for discovery. Custom aliases, UI package
+For manual adoption, merge the needed plugins and rules into the existing root
+config and use `--no-oxlint` to leave that config project-owned. Keep spacing enabled
+alongside the project's other lint rules. Standard shadcn projects use
+`components.json` for discovery. Custom aliases, UI package
 imports, theme paths, and component-directory overrides must match the project.
 For example, a custom component import prefix can use
 `"settings": { "shadcn": { "ui": "@workspace/ui/components" } }`.

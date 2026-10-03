@@ -33,9 +33,11 @@ afterEach(() => {
 
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), "workflow-install-"));
+
   temporary.push(root);
   const source = join(root, "source");
   const target = join(root, "target project");
+
   mkdirSync(target);
   cpSync(join(repository, "ts"), join(source, "ts"), { recursive: true });
 
@@ -44,9 +46,11 @@ function fixture() {
 
 function snapshot(root: string): Record<string, string> {
   const files: Record<string, string> = {};
+
   const visit = (path: string) => {
     for (const entry of readdirSync(join(root, path), { withFileTypes: true })) {
       const child = path ? `${path}/${entry.name}` : entry.name;
+
       if (entry.isDirectory()) visit(child);
       else if (entry.isFile()) files[child] = readFileSync(join(root, child)).toString("base64");
     }
@@ -60,9 +64,12 @@ function snapshot(root: string): Record<string, string> {
 function checkLinks(target: string) {
   for (const [path, bytes] of Object.entries(snapshot(target))) {
     if (!path.endsWith(".md")) continue;
+
     const text = Buffer.from(bytes, "base64").toString();
+
     for (const [, link] of text.matchAll(/\[[^\]]*\]\(([^\s)]+)\)/g)) {
       if (!link || /^[a-z]+:|^#|^\//.test(link)) continue;
+
       expect(existsSync(resolve(target, dirname(path), link.split("#")[0] ?? ""))).toBe(true);
     }
   }
@@ -70,8 +77,10 @@ function checkLinks(target: string) {
 
 test("CLI previews without creating anything, including for a target with spaces", () => {
   const { target } = fixture();
+
   writeFileSync(join(target, "AGENTS.md"), "# Project rules\n");
   const before = snapshot(target);
+
   const result = Bun.spawnSync(
     [
       process.execPath,
@@ -100,13 +109,16 @@ test("CLI previews without creating anything, including for a target with spaces
 test("installs whole skills, preserves project instructions, and keeps all references local", () => {
   const options = fixture();
   const original = "# Application\n\nUse the existing test runner.\n";
+
   writeFileSync(join(options.target, "AGENTS.md"), original);
   WorkflowInstaller.apply(
     WorkflowInstaller.plan({ ...options, profiles: ["web"], skills: ["shadcn", "bro", "unslop"] }),
   );
   const instructions = readFileSync(join(options.target, "AGENTS.md"), "utf8");
+
   expect(instructions.startsWith(original)).toBe(true);
   expect(instructions).toContain(".agents/workflow/AGENTS.md");
+
   for (const name of [
     "shadcn",
     "bro",
@@ -118,9 +130,12 @@ test("installs whole skills, preserves project instructions, and keeps all refer
       snapshot(join(options.source, "ts/skills", name)),
     );
   }
+
   expect(existsSync(join(options.target, ".agents/skills/turborepo"))).toBe(false);
   expect(existsSync(join(options.target, "biome.json"))).toBe(false);
-  expect(existsSync(join(options.target, ".oxlintrc.json"))).toBe(false);
+  expect(readFileSync(join(options.target, ".oxlintrc.json"))).toEqual(
+    readFileSync(join(options.source, "ts/configs/oxlint.json")),
+  );
   expect(readFileSync(join(options.target, ".agents/workflow/testing.md"))).toEqual(
     readFileSync(join(options.source, "ts/testing.md")),
   );
@@ -129,6 +144,7 @@ test("installs whole skills, preserves project instructions, and keeps all refer
 
 test("repeat installation is a no-op and omitted options retain selections", () => {
   const options = fixture();
+
   WorkflowInstaller.apply(
     WorkflowInstaller.plan({
       ...options,
@@ -139,6 +155,7 @@ test("repeat installation is a no-op and omitted options retain selections", () 
   );
   const before = snapshot(options.target);
   const repeated = WorkflowInstaller.plan(options);
+
   expect(repeated.changes.every((change) => change.status === "unchanged")).toBe(true);
   WorkflowInstaller.apply(repeated);
   expect(snapshot(options.target)).toEqual(before);
@@ -149,15 +166,19 @@ test("repeat installation is a no-op and omitted options retain selections", () 
 
 test("updates unchanged managed copies and preserves edits outside the AGENTS block", () => {
   const options = fixture();
+
   WorkflowInstaller.apply(WorkflowInstaller.plan(options));
   const agentPath = join(options.target, "AGENTS.md");
+
   writeFileSync(
     agentPath,
     readFileSync(agentPath, "utf8") + "\n## Local commands\nUse bun test.\n",
   );
   const sourcePath = join(options.source, "ts/react.md");
+
   writeFileSync(sourcePath, readFileSync(sourcePath, "utf8") + "\nNew shared guidance.\n");
   const plan = WorkflowInstaller.plan(options);
+
   expect(plan.changes.find((change) => change.path.endsWith("/react.md"))?.status).toBe("update");
   WorkflowInstaller.apply(plan);
   expect(readFileSync(join(options.target, ".agents/workflow/react.md"))).toEqual(
@@ -168,16 +189,20 @@ test("updates unchanged managed copies and preserves edits outside the AGENTS bl
 
 test("upgrades an older managed instruction block without replacing surrounding content", () => {
   const options = fixture();
+
   WorkflowInstaller.apply(WorkflowInstaller.plan(options));
   const path = join(options.target, "AGENTS.md");
   const oldBlock = "<!-- workflow:begin -->\nPrevious installer guidance.\n<!-- workflow:end -->";
+
   writeFileSync(path, `# Local rules\n\n${oldBlock}\n\nKeep this footer.\n`);
   const recordPath = join(options.target, ".agents/workflow/install.json");
   const record = JSON.parse(readFileSync(recordPath, "utf8"));
+
   record.agentsBlockHash = createHash("sha256").update(oldBlock).digest("hex");
   writeFileSync(recordPath, JSON.stringify(record));
   WorkflowInstaller.apply(WorkflowInstaller.plan(options));
   const result = readFileSync(path, "utf8");
+
   expect(result.startsWith("# Local rules\n\n")).toBe(true);
   expect(result.endsWith("\n\nKeep this footer.\n")).toBe(true);
   expect(result).toContain(".agents/workflow/AGENTS.md");
@@ -187,6 +212,7 @@ test("upgrades an older managed instruction block without replacing surrounding 
 test("preserves restricted permissions when updating an existing instruction file", () => {
   const options = fixture();
   const path = join(options.target, "AGENTS.md");
+
   writeFileSync(path, "# Private project instructions\n");
   chmodSync(path, 0o600);
   WorkflowInstaller.apply(WorkflowInstaller.plan(options));
@@ -195,10 +221,12 @@ test("preserves restricted permissions when updating an existing instruction fil
 
 test("local managed-file edits block every write", () => {
   const options = fixture();
+
   WorkflowInstaller.apply(WorkflowInstaller.plan(options));
   writeFileSync(join(options.target, ".agents/workflow/react.md"), "Local customization");
   const before = snapshot(options.target);
   const plan = WorkflowInstaller.plan({ ...options, skills: ["tdd"] });
+
   expect(plan.changes.some((change) => change.status === "conflict")).toBe(true);
   expect(() => WorkflowInstaller.apply(plan)).toThrow("no files were written");
   expect(snapshot(options.target)).toEqual(before);
@@ -206,9 +234,11 @@ test("local managed-file edits block every write", () => {
 
 test("locally deleted managed files are reported instead of silently recreated", () => {
   const options = fixture();
+
   WorkflowInstaller.apply(WorkflowInstaller.plan(options));
   rmSync(join(options.target, ".agents/workflow/react.md"));
   const plan = WorkflowInstaller.plan(options);
+
   expect(plan.changes.find((change) => change.path.endsWith("/react.md"))?.status).toBe("conflict");
 });
 
@@ -218,10 +248,12 @@ test.each([
   "tsconfig.base.json",
 ])("root config %s is opt-in and existing content is preserved", (name) => {
   const options = fixture();
+
   writeFileSync(join(options.target, name), '{"local":true}\n');
   WorkflowInstaller.apply(WorkflowInstaller.plan(options));
   const before = snapshot(options.target);
   const plan = WorkflowInstaller.plan({ ...options, configs: true });
+
   expect(plan.changes.find((change) => change.path === name)?.status).toBe("conflict");
   expect(() => WorkflowInstaller.apply(plan)).toThrow();
   expect(snapshot(options.target)).toEqual(before);
@@ -229,13 +261,16 @@ test.each([
 
 test("copies requested root templates without changing the application's tsconfig", () => {
   const options = fixture();
+
   writeFileSync(join(options.target, "tsconfig.json"), '{"extends":"expo/tsconfig.base"}\n');
   WorkflowInstaller.apply(WorkflowInstaller.plan({ ...options, configs: true }));
+
   for (const name of ["biome.json", "tsconfig.base.json"]) {
     expect(readFileSync(join(options.target, name))).toEqual(
       readFileSync(join(options.source, "ts/configs", name)),
     );
   }
+
   expect(readFileSync(join(options.target, "tsconfig.json"), "utf8")).toBe(
     '{"extends":"expo/tsconfig.base"}\n',
   );
@@ -248,21 +283,22 @@ test.each([
   "oxlint.config.mts",
 ])("Oxlint adoption preserves existing %s before any writes", (name) => {
   const options = fixture();
+
   writeFileSync(join(options.target, name), "Local config\n");
-  WorkflowInstaller.apply(WorkflowInstaller.plan(options));
   const before = snapshot(options.target);
 
-  const plan = WorkflowInstaller.plan({ ...options, oxlint: true });
+  const plan = WorkflowInstaller.plan(options);
 
   expect(plan.changes.find((change) => change.path === name)?.status).toBe("conflict");
   expect(() => WorkflowInstaller.apply(plan)).toThrow("no files were written");
   expect(snapshot(options.target)).toEqual(before);
 });
 
-test("combined Oxlint config is copied in full, retained, and removable", () => {
+test("combined Oxlint config is installed by default, retained, and removable", () => {
   const options = fixture();
   const rootConfig = join(options.target, ".oxlintrc.json");
-  WorkflowInstaller.apply(WorkflowInstaller.plan({ ...options, oxlint: true }));
+
+  WorkflowInstaller.apply(WorkflowInstaller.plan(options));
   expect(readFileSync(rootConfig)).toEqual(
     readFileSync(join(options.source, "ts/configs/oxlint.json")),
   );
@@ -273,10 +309,12 @@ test("combined Oxlint config is copied in full, retained, and removable", () => 
   WorkflowInstaller.apply(WorkflowInstaller.plan({ ...options, oxlint: false }));
   expect(existsSync(rootConfig)).toBe(false);
   expect(existsSync(join(options.target, ".agents/workflow/configs/oxlint.json"))).toBe(true);
+  expect(WorkflowInstaller.plan(options).changes.every(({ status }) => status === "unchanged")).toBe(true);
 });
 
 test("Oxlint changes and removal never overwrite local edits", () => {
   const options = fixture();
+
   WorkflowInstaller.apply(WorkflowInstaller.plan({ ...options, oxlint: true }));
   writeFileSync(join(options.target, ".oxlintrc.json"), '{"rules":{}}\n');
   const before = snapshot(options.target);
@@ -289,9 +327,11 @@ test("Oxlint changes and removal never overwrite local edits", () => {
 
 test("existing install records without Oxlint remain valid and do not activate it", () => {
   const options = fixture();
-  WorkflowInstaller.apply(WorkflowInstaller.plan(options));
+
+  WorkflowInstaller.apply(WorkflowInstaller.plan({ ...options, oxlint: false }));
   const path = join(options.target, ".agents/workflow/install.json");
   const record = JSON.parse(readFileSync(path, "utf8"));
+
   delete record.oxlint;
   writeFileSync(path, JSON.stringify(record));
 
@@ -304,12 +344,14 @@ test("existing install records without Oxlint remain valid and do not activate i
 
 test("omits Biome references for projects using another formatter", () => {
   const options = fixture();
+
   WorkflowInstaller.apply(WorkflowInstaller.plan(options));
   WorkflowInstaller.apply(WorkflowInstaller.plan({ ...options, biome: false }));
 
   expect(existsSync(join(options.target, ".agents/workflow/configs/biome.json"))).toBe(false);
   expect(readFileSync(join(options.target, ".agents/workflow/configs/README.md"), "utf8")).not.toContain("Biome");
   const guide = readFileSync(join(options.target, ".agents/workflow/stacks.md"), "utf8");
+
   expect(guide).not.toContain("Ultracite");
   expect(guide).toContain("configs/README.md");
   checkLinks(options.target);
@@ -323,13 +365,16 @@ test("omits Biome references for projects using another formatter", () => {
 
 test("changing profiles removes obsolete managed skills while preserving unrelated files", () => {
   const options = fixture();
+
   WorkflowInstaller.apply(WorkflowInstaller.plan({ ...options, profiles: ["web", "workspace"] }));
   const userFile = join(options.target, ".agents/skills/turborepo/personal.txt");
+
   writeFileSync(userFile, "Keep me");
   WorkflowInstaller.apply(WorkflowInstaller.plan({ ...options, profiles: ["bun-api"] }));
   expect(existsSync(join(options.target, ".agents/skills/turborepo/SKILL.md"))).toBe(false);
   expect(readFileSync(userFile, "utf8")).toBe("Keep me");
   const guide = readFileSync(join(options.target, ".agents/workflow/stacks.md"), "utf8");
+
   expect(guide).toContain("## Bun API");
   expect(guide).not.toContain("## React web");
   checkLinks(options.target);
@@ -337,9 +382,11 @@ test("changing profiles removes obsolete managed skills while preserving unrelat
 
 test("refuses to remove edited skill files when changing selection", () => {
   const options = fixture();
+
   WorkflowInstaller.apply(WorkflowInstaller.plan({ ...options, skills: ["tdd"] }));
   writeFileSync(join(options.target, ".agents/skills/tdd/SKILL.md"), "Customized skill");
   const before = snapshot(options.target);
+
   expect(() =>
     WorkflowInstaller.apply(WorkflowInstaller.plan({ ...options, skills: [] })),
   ).toThrow();
@@ -349,9 +396,11 @@ test("refuses to remove edited skill files when changing selection", () => {
 test("an unmanaged skill is a conflict even when its entry matches the source", () => {
   const options = fixture();
   const path = join(options.target, ".agents/skills/tdd");
+
   mkdirSync(path, { recursive: true });
   cpSync(join(options.source, "ts/skills/tdd/SKILL.md"), join(path, "SKILL.md"));
   const before = snapshot(options.target);
+
   expect(() =>
     WorkflowInstaller.apply(WorkflowInstaller.plan({ ...options, skills: ["tdd"] })),
   ).toThrow();
@@ -366,16 +415,24 @@ test.each([
   "removed",
 ])("protects instruction ownership: %s", (kind) => {
   const options = fixture();
+
   WorkflowInstaller.apply(WorkflowInstaller.plan(options));
   const path = join(options.target, "AGENTS.md");
   const original = readFileSync(path, "utf8");
+
   if (kind === "AGENTS.override.md") writeFileSync(join(options.target, kind), "Overrides");
+
   if (kind === "malformed") writeFileSync(path, original.replace("<!-- workflow:end -->", ""));
+
   if (kind === "duplicate") writeFileSync(path, original + original);
+
   if (kind === "edited")
     writeFileSync(path, original.replace("TypeScript workflow", "Custom workflow"));
+
   if (kind === "removed") writeFileSync(path, "Only local instructions\n");
+
   const before = snapshot(options.target);
+
   expect(() => WorkflowInstaller.apply(WorkflowInstaller.plan(options))).toThrow();
   expect(snapshot(options.target)).toEqual(before);
 });
@@ -384,9 +441,11 @@ test("preserves CRLF project content and does not duplicate its instruction bloc
   const options = fixture();
   const path = join(options.target, "AGENTS.md");
   const original = "# Local\r\n\r\nFollow our rules.\r\n";
+
   writeFileSync(path, original);
   WorkflowInstaller.apply(WorkflowInstaller.plan(options));
   const first = readFileSync(path, "utf8");
+
   expect(first.startsWith(original)).toBe(true);
   WorkflowInstaller.apply(WorkflowInstaller.plan(options));
   expect(readFileSync(path, "utf8")).toBe(first);
@@ -399,6 +458,7 @@ test.each([
 ])("rejects symlink destinations: %s", (path) => {
   const options = fixture();
   const outside = join(options.root, "outside");
+
   mkdirSync(outside);
   mkdirSync(dirname(join(options.target, path)), { recursive: true });
   symlinkSync(outside, join(options.target, path));
@@ -410,12 +470,15 @@ test.each([
 
 test("rejects traversal in an install record before any writes", () => {
   const options = fixture();
+
   WorkflowInstaller.apply(WorkflowInstaller.plan(options));
   const path = join(options.target, ".agents/workflow/install.json");
   const record = JSON.parse(readFileSync(path, "utf8"));
+
   record.files[".agents/skills/tdd/../../../../outside"] = "0".repeat(64);
   writeFileSync(path, JSON.stringify(record));
   const before = snapshot(options.target);
+
   expect(() => WorkflowInstaller.plan(options)).toThrow("Invalid install record entry");
   expect(snapshot(options.target)).toEqual(before);
 });
@@ -423,6 +486,7 @@ test("rejects traversal in an install record before any writes", () => {
 test("rechecks all planned paths before writing, including an added override", () => {
   const options = fixture();
   const plan = WorkflowInstaller.plan(options);
+
   writeFileSync(join(options.target, "AGENTS.override.md"), "New instructions");
   expect(() => WorkflowInstaller.apply(plan)).toThrow("Changed since preview");
   expect(existsSync(join(options.target, ".agents"))).toBe(false);
@@ -430,6 +494,7 @@ test("rechecks all planned paths before writing, including an added override", (
 
 test("validates source, profiles, skill names, and overlapping targets", () => {
   const options = fixture();
+
   expect(() => WorkflowInstaller.plan({ ...options, profiles: ["unknown"] })).toThrow(
     "Unknown profile",
   );
@@ -450,12 +515,14 @@ test.each(
   Object.keys(profiles),
 )("profile %s produces a usable guide and complete links", (profile) => {
   const options = fixture();
+
   WorkflowInstaller.apply(WorkflowInstaller.plan({ ...options, profiles: [profile] }));
   checkLinks(options.target);
 });
 
 test("CLI rejects unknown options and conflicts, and can clear extra skills", () => {
   const options = fixture();
+
   const cli = (args: string[]) =>
     Bun.spawnSync([
       process.execPath,
@@ -478,6 +545,7 @@ test("CLI rejects unknown options and conflicts, and can clear extra skills", ()
   expect(existsSync(join(options.target, ".agents/skills/tdd/SKILL.md"))).toBe(false);
   writeFileSync(join(options.target, ".agents/workflow/react.md"), "Local edits");
   const result = cli(["--dry-run"]);
+
   expect(result.exitCode).toBe(1);
   expect(result.stdout.toString()).toContain("conflict");
 });

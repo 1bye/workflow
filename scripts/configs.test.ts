@@ -19,8 +19,9 @@ afterEach(() => {
 
 function fixture() {
   const target = mkdtempSync(join(tmpdir(), "workflow-lint-"));
+
   temporary.push(target);
-  WorkflowInstaller.apply(WorkflowInstaller.plan({ target, oxlint: true, configs: true }));
+  WorkflowInstaller.apply(WorkflowInstaller.plan({ target, configs: true }));
   symlinkSync(join(repository, "node_modules"), join(target, "node_modules"));
 
   return target;
@@ -53,6 +54,7 @@ function lint(target: string, paths: string[], fix = false) {
 test("installed spacing rules fix gaps and remain stable with the shared Biome formatter", () => {
   const target = fixture();
   const path = "sample.ts";
+
   write(
     target,
     path,
@@ -65,6 +67,14 @@ test("installed spacing rules fix gaps and remain stable with the shared Biome f
     count: first + second,
   };
   console.log(options);
+  if (options.count < 0) {
+    throw new Error("Invalid count");
+  }
+  for (const value of [first, second]) {
+    console.log(value);
+  }
+  const result = options.count;
+  console.log(result);
 
 
   console.log(second);
@@ -75,6 +85,7 @@ test("installed spacing rules fix gaps and remain stable with the shared Biome f
   );
 
   const before = lint(target, [path]);
+
   expect(before.exitCode).toBe(1);
   expect(new Set(before.diagnostics.map(({ code }) => code))).toEqual(
     new Set([
@@ -86,8 +97,14 @@ test("installed spacing rules fix gaps and remain stable with the shared Biome f
   expect(lint(target, [path], true).exitCode).toBe(0);
 
   const fixed = readFileSync(join(target, path), "utf8");
+
   expect(fixed).toContain("  const first = 1;\n  const second = 2;");
+  expect(fixed).toContain("  if (!enabled) return 0;\n\n  const first");
+  expect(fixed).toContain("  const second = 2;\n\n  const options");
   expect(fixed).toContain("  };\n\n  console.log(options);");
+  expect(fixed).toContain("  console.log(options);\n\n  if (options.count");
+  expect(fixed).toContain('  if (options.count < 0) {\n    throw new Error("Invalid count");\n  }\n\n  for');
+  expect(fixed).toContain("  }\n\n  const result = options.count;\n\n  console.log(result);");
   expect(fixed).toContain("  console.log(second);\n\n  return options.count;");
   expect(fixed).toContain("{\n  if (!enabled) return 0;");
   expect(fixed).toEndWith("  return options.count;\n}\n");
@@ -99,6 +116,7 @@ test("installed spacing rules fix gaps and remain stable with the shared Biome f
 
   expect(format().exitCode).toBe(0);
   const formatted = readFileSync(join(target, path), "utf8");
+
   expect(lint(target, [path]).exitCode).toBe(0);
   expect(lint(target, [path], true).exitCode).toBe(0);
   expect(format().exitCode).toBe(0);
@@ -107,6 +125,7 @@ test("installed spacing rules fix gaps and remain stable with the shared Biome f
 
 test("combined config recognizes theme and components while retaining spacing rules", () => {
   const target = fixture();
+
   write(target, "package.json", '{"private":true,"type":"module"}');
   write(
     target,
@@ -163,10 +182,12 @@ export function value() {
   );
 
   const valid = lint(target, ["src/valid.tsx", "src/components/ui"]);
+
   expect(valid.diagnostics).toEqual([]);
   expect(valid.exitCode).toBe(0);
 
   const invalid = lint(target, ["src/invalid.tsx"]);
+
   expect(invalid.exitCode).toBe(1);
   expect(new Set(invalid.diagnostics.map(({ code }) => code))).toEqual(
     new Set([
