@@ -40,6 +40,7 @@ function fixture() {
 
   mkdirSync(target);
   cpSync(join(repository, "ts"), join(source, "ts"), { recursive: true });
+  cpSync(join(repository, "rust"), join(source, "rust"), { recursive: true });
 
   return { root, source, target };
 }
@@ -309,7 +310,9 @@ test("combined Oxlint config is installed by default, retained, and removable", 
   WorkflowInstaller.apply(WorkflowInstaller.plan({ ...options, oxlint: false }));
   expect(existsSync(rootConfig)).toBe(false);
   expect(existsSync(join(options.target, ".agents/workflow/configs/oxlint.json"))).toBe(true);
-  expect(WorkflowInstaller.plan(options).changes.every(({ status }) => status === "unchanged")).toBe(true);
+  expect(
+    WorkflowInstaller.plan(options).changes.every(({ status }) => status === "unchanged"),
+  ).toBe(true);
 });
 
 test("Oxlint changes and removal never overwrite local edits", () => {
@@ -349,7 +352,9 @@ test("omits Biome references for projects using another formatter", () => {
   WorkflowInstaller.apply(WorkflowInstaller.plan({ ...options, biome: false }));
 
   expect(existsSync(join(options.target, ".agents/workflow/configs/biome.json"))).toBe(false);
-  expect(readFileSync(join(options.target, ".agents/workflow/configs/README.md"), "utf8")).not.toContain("Biome");
+  expect(
+    readFileSync(join(options.target, ".agents/workflow/configs/README.md"), "utf8"),
+  ).not.toContain("Biome");
   const guide = readFileSync(join(options.target, ".agents/workflow/stacks.md"), "utf8");
 
   expect(guide).not.toContain("Ultracite");
@@ -548,4 +553,178 @@ test("CLI rejects unknown options and conflicts, and can clear extra skills", ()
 
   expect(result.exitCode).toBe(1);
   expect(result.stdout.toString()).toContain("conflict");
+});
+
+test("Rust-only installation supplies complete guides and skill without TypeScript tooling", () => {
+  const options = fixture();
+  const cargo = '[package]\nname = "existing"\nversion = "0.1.0"\n';
+  const toolchain = '[toolchain]\nchannel = "1.85.0"\n';
+
+  writeFileSync(join(options.target, "Cargo.toml"), cargo);
+  writeFileSync(join(options.target, "rust-toolchain.toml"), toolchain);
+  writeFileSync(join(options.target, "biome.jsonc"), "Unrelated config\n");
+  writeFileSync(join(options.target, ".oxlintrc.json"), "Unrelated lint config\n");
+  WorkflowInstaller.apply(
+    WorkflowInstaller.plan({
+      ...options,
+      profiles: ["rust-library", "rust-workspace"],
+      configs: true,
+    }),
+  );
+
+  const files = snapshot(options.target);
+  const instructions = readFileSync(join(options.target, "AGENTS.md"), "utf8");
+
+  expect(instructions).toContain(".agents/workflow/rust/AGENTS.md");
+  expect(instructions).not.toContain("TypeScript work");
+  expect(files[".agents/workflow/AGENTS.md"]).toBeUndefined();
+  expect(files[".agents/workflow/react.md"]).toBeUndefined();
+  expect(files["biome.json"]).toBeUndefined();
+  expect(readFileSync(join(options.target, ".oxlintrc.json"), "utf8")).toBe(
+    "Unrelated lint config\n",
+  );
+  expect(readFileSync(join(options.target, "Cargo.toml"), "utf8")).toBe(cargo);
+  expect(readFileSync(join(options.target, "rust-toolchain.toml"), "utf8")).toBe(toolchain);
+  expect(readFileSync(join(options.target, "rustfmt.toml"))).toEqual(
+    readFileSync(join(options.source, "rust/configs/rustfmt.toml")),
+  );
+  expect(snapshot(join(options.target, ".agents/skills/rust-development"))).toEqual(
+    snapshot(join(options.source, "rust/skills/rust-development")),
+  );
+  const guide = readFileSync(join(options.target, ".agents/workflow/rust/stacks.md"), "utf8");
+
+  expect(guide).toContain("## Library");
+  expect(guide).toContain("## Workspace layer");
+  expect(guide).not.toContain("## CLI");
+  checkLinks(options.target);
+  expect(
+    WorkflowInstaller.plan(options).changes.every(({ status }) => status === "unchanged"),
+  ).toBe(true);
+});
+
+test("adding and removing Rust profiles preserves an existing TypeScript installation", () => {
+  const options = fixture();
+
+  WorkflowInstaller.apply(WorkflowInstaller.plan({ ...options, profiles: ["web"], configs: true }));
+  const before = snapshot(options.target);
+
+  WorkflowInstaller.apply(
+    WorkflowInstaller.plan({ ...options, profiles: ["web", "rust-native-wasm"] }),
+  );
+
+  for (const [path, content] of Object.entries(before)) {
+    if (path === "AGENTS.md" || path.endsWith("/install.json")) continue;
+
+    expect(snapshot(options.target)[path]).toBe(content);
+  }
+
+  expect(readFileSync(join(options.target, "AGENTS.md"), "utf8")).toContain(
+    "TypeScript and Rust workflow",
+  );
+  expect(existsSync(join(options.target, "rustfmt.toml"))).toBe(true);
+  checkLinks(options.target);
+  WorkflowInstaller.apply(WorkflowInstaller.plan({ ...options, profiles: ["web"] }));
+  expect(snapshot(options.target)).toEqual(before);
+});
+
+test("switching languages removes only unedited managed files and keeps tooling choices", () => {
+  const options = fixture();
+
+  WorkflowInstaller.apply(
+    WorkflowInstaller.plan({ ...options, profiles: ["core"], configs: true }),
+  );
+  WorkflowInstaller.apply(WorkflowInstaller.plan({ ...options, profiles: ["rust"] }));
+  expect(existsSync(join(options.target, ".oxlintrc.json"))).toBe(false);
+  expect(existsSync(join(options.target, "biome.json"))).toBe(false);
+  expect(existsSync(join(options.target, "rustfmt.toml"))).toBe(true);
+
+  WorkflowInstaller.apply(WorkflowInstaller.plan({ ...options, profiles: ["core"] }));
+  expect(existsSync(join(options.target, ".oxlintrc.json"))).toBe(true);
+  expect(existsSync(join(options.target, "rustfmt.toml"))).toBe(false);
+  expect(existsSync(join(options.target, ".agents/workflow/rust/AGENTS.md"))).toBe(false);
+});
+
+test.each([
+  "rustfmt.toml",
+  ".rustfmt.toml",
+])("Rust formatter adoption preserves existing %s", (name) => {
+  const options = fixture();
+
+  writeFileSync(join(options.target, name), "max_width = 88\n");
+  WorkflowInstaller.apply(WorkflowInstaller.plan({ ...options, profiles: ["rust"] }));
+  const before = snapshot(options.target);
+  const plan = WorkflowInstaller.plan({ ...options, configs: true });
+
+  expect(plan.changes.find(({ path }) => path === name)?.status).toBe("conflict");
+  expect(() => WorkflowInstaller.apply(plan)).toThrow("no files were written");
+  expect(snapshot(options.target)).toEqual(before);
+});
+
+test.each([
+  "rustfmt.toml",
+  ".agents/workflow/rust/architecture.md",
+  ".agents/skills/rust-development/references/ownership.md",
+])("Rust updates and removal protect local edits in %s", (path) => {
+  const options = fixture();
+
+  WorkflowInstaller.apply(
+    WorkflowInstaller.plan({ ...options, profiles: ["rust"], configs: true }),
+  );
+  writeFileSync(join(options.target, path), "Local changes\n");
+  const before = snapshot(options.target);
+
+  for (const selected of [["rust"], ["core"]]) {
+    const plan = WorkflowInstaller.plan({ ...options, profiles: selected });
+
+    expect(() => WorkflowInstaller.apply(plan)).toThrow("no files were written");
+    expect(snapshot(options.target)).toEqual(before);
+  }
+});
+
+test("Rust source updates propagate through recorded selections", () => {
+  const options = fixture();
+
+  WorkflowInstaller.apply(WorkflowInstaller.plan({ ...options, profiles: ["rust-cli"] }));
+  const sourcePath = join(options.source, "rust/architecture.md");
+
+  writeFileSync(sourcePath, readFileSync(sourcePath, "utf8") + "\nNew architecture guidance.\n");
+  WorkflowInstaller.apply(WorkflowInstaller.plan(options));
+  expect(readFileSync(join(options.target, ".agents/workflow/rust/architecture.md"))).toEqual(
+    readFileSync(sourcePath),
+  );
+});
+
+test("Rust CLI preview is read-only and profiles control active tools", () => {
+  const options = fixture();
+
+  const cli = (...args: string[]) =>
+    Bun.spawnSync([
+      process.execPath,
+      join(repository, "scripts/install.ts"),
+      options.target,
+      ...args,
+    ]);
+
+  const preview = cli("--profile", "rust-cli,rust-async", "--configs", "--dry-run");
+
+  expect(preview.exitCode).toBe(0);
+  expect(preview.stdout.toString()).toContain("rustfmt.toml");
+  expect(preview.stdout.toString()).not.toContain(".oxlintrc.json");
+  expect(snapshot(options.target)).toEqual({});
+  expect(cli("--profile", "rust", "--oxlint").exitCode).toBe(1);
+  expect(cli("--profile", "rust", "--configs", "--no-biome").exitCode).toBe(0);
+  checkLinks(options.target);
+});
+
+test("Rust destinations reject symlinked guide parents", () => {
+  const options = fixture();
+  const outside = join(options.root, "outside");
+
+  mkdirSync(outside);
+  mkdirSync(join(options.target, ".agents/workflow"), { recursive: true });
+  symlinkSync(outside, join(options.target, ".agents/workflow/rust"));
+  expect(() =>
+    WorkflowInstaller.apply(WorkflowInstaller.plan({ ...options, profiles: ["rust"] })),
+  ).toThrow();
+  expect(readdirSync(outside)).toEqual([]);
 });

@@ -12,23 +12,44 @@ import {
 } from "node:fs";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { parseArgs } from "node:util";
-import { type Profile, profiles, type Skill, skills } from "./profiles";
+import {
+  type Language,
+  type Profile,
+  profiles,
+  type Skill,
+  skills,
+  skillSources,
+} from "./profiles";
 
 const bundle = ".agents/workflow";
 const recordPath = `${bundle}/install.json`;
 const begin = "<!-- workflow:begin -->";
 const end = "<!-- workflow:end -->";
 
-const guideFiles = [
-  "AGENTS.md",
-  "react.md",
-  "testing.md",
-  "stacks.md",
-  "configs/README.md",
-  "configs/biome.json",
-  "configs/tsconfig.base.json",
-  "configs/oxlint.json",
-];
+const guideFiles: Record<Language, string[]> = {
+  ts: [
+    "AGENTS.md",
+    "react.md",
+    "testing.md",
+    "stacks.md",
+    "configs/README.md",
+    "configs/biome.json",
+    "configs/tsconfig.base.json",
+    "configs/oxlint.json",
+  ],
+  rust: [
+    "AGENTS.md",
+    "architecture.md",
+    "testing.md",
+    "rustdoc.md",
+    "stacks.md",
+    "configs/README.md",
+    "configs/rustfmt.toml",
+    "configs/cargo-lints.toml",
+  ],
+};
+
+const guideRoots: Record<Language, string> = { ts: bundle, rust: `${bundle}/rust` };
 
 type InstallRecord = {
   version: 1;
@@ -67,9 +88,15 @@ export class WorkflowInstaller {
   }
 
   private static isManagedPath(path: string): boolean {
-    if (["biome.json", "tsconfig.base.json", ".oxlintrc.json"].includes(path)) return true;
+    if (["biome.json", "tsconfig.base.json", ".oxlintrc.json", "rustfmt.toml"].includes(path))
+      return true;
 
-    if (guideFiles.some((name) => path === `${bundle}/${name}`)) return true;
+    if (
+      Object.entries(guideFiles).some(([language, names]) =>
+        names.some((name) => path === `${guideRoots[language as Language]}/${name}`),
+      )
+    )
+      return true;
 
     return (
       skills.some((name) => path.startsWith(`.agents/skills/${name}/`)) &&
@@ -169,13 +196,14 @@ export class WorkflowInstaller {
 
   private static stackGuide(
     source: string,
+    language: Language,
     selected: Profile[],
     installed: Set<string>,
     biome: boolean,
   ): Buffer {
-    const text = WorkflowInstaller.read(source, "ts/stacks.md");
+    const text = WorkflowInstaller.read(source, `${language}/stacks.md`);
 
-    if (!text) throw new Error("Missing source: ts/stacks.md");
+    if (!text) throw new Error(`Missing source: ${language}/stacks.md`);
 
     const sections = new Map(
       text
@@ -205,21 +233,26 @@ export class WorkflowInstaller {
       })
       .join("\n\n");
 
-    if (!biome) {
+    if (language === "ts" && !biome) {
       body = body.replace(
         "[Ultracite](skills/ultracite/SKILL.md) applies where Ultracite is installed or being\nadopted. ",
         "",
       );
     }
 
-    const guide = `# Installed TypeScript profiles\n\nSelected: ${selected.join(", ")}.\n\nUse [the baseline](AGENTS.md), [React guidance](react.md) where applicable,\nand [config guidance](configs/README.md).\n\n${body}\n`;
+    const introduction =
+      language === "ts"
+        ? "Use [the baseline](AGENTS.md), [React guidance](react.md) where applicable,\nand [config guidance](configs/README.md)."
+        : "Use [the baseline](AGENTS.md), [architecture](architecture.md),\n[testing](testing.md), [documentation](rustdoc.md), and [config guidance](configs/README.md).";
+
+    const guide = `# Installed ${language === "ts" ? "TypeScript" : "Rust"} profiles\n\nSelected: ${selected.join(", ")}.\n\n${introduction}\n\n${body}\n`;
 
     return Buffer.from(
       guide.replace(
         /\[([^\]]+)\]\(skills\/([^/]+)\/SKILL\.md\)/g,
         (_match, label: string, skill: string) =>
           installed.has(skill)
-            ? `[${label}](../skills/${skill}/SKILL.md)`
+            ? `[${label}](${language === "ts" ? ".." : "../.."}/skills/${skill}/SKILL.md)`
             : `${label} (skill not installed)`,
       ),
     );
@@ -251,13 +284,16 @@ export class WorkflowInstaller {
 
     if (!selected.length) throw new Error("Choose at least one profile");
 
+    const hasTypeScript = selected.some((name) => profiles[name].language === "ts");
+    const hasRust = selected.some((name) => profiles[name].language === "rust");
+
     const extras = WorkflowInstaller.selection(
       options.skills ?? previous?.extraSkills ?? [],
       skills,
       "skill",
     );
 
-    const installed = new Set<string>([
+    const installed = new Set<Skill>([
       ...selected.flatMap((name) => [...profiles[name].skills]),
       ...extras,
     ]);
@@ -266,27 +302,40 @@ export class WorkflowInstaller {
     const oxlint = options.oxlint ?? previous?.oxlint ?? !previous;
     const biome = options.biome ?? previous?.biome ?? true;
 
-    if (!biome && configs) throw new Error("--configs requires Biome guidance");
+    if (hasTypeScript && !biome && configs) throw new Error("--configs requires Biome guidance");
+
+    if (!hasTypeScript && options.oxlint === true)
+      throw new Error("--oxlint requires a TypeScript profile");
 
     const desired = new Map<string, Buffer>();
 
-    for (const name of guideFiles) {
-      if (!biome && name === "configs/biome.json") continue;
+    for (const language of ["ts", "rust"] as const) {
+      const languageProfiles = selected.filter((name) => profiles[name].language === language);
 
-      const content = WorkflowInstaller.read(
-        source,
-        name === "configs/README.md" && !biome ? "ts/configs/oxc.md" : `ts/${name}`,
-      );
+      if (!languageProfiles.length) continue;
 
-      if (!content) throw new Error(`Missing source: ts/${name}`);
+      for (const name of guideFiles[language]) {
+        if (language === "ts" && !biome && name === "configs/biome.json") continue;
 
-      desired.set(
-        `${bundle}/${name}`,
-        name === "stacks.md" ? WorkflowInstaller.stackGuide(source, selected, installed, biome) : content,
-      );
+        const sourcePath =
+          language === "ts" && name === "configs/README.md" && !biome
+            ? "ts/configs/oxc.md"
+            : `${language}/${name}`;
+
+        const content = WorkflowInstaller.read(source, sourcePath);
+
+        if (!content) throw new Error(`Missing source: ${sourcePath}`);
+
+        desired.set(
+          `${guideRoots[language]}/${name}`,
+          name === "stacks.md"
+            ? WorkflowInstaller.stackGuide(source, language, languageProfiles, installed, biome)
+            : content,
+        );
+      }
     }
 
-    const copySkill = (path: string) => {
+    const copySkill = (path: string, destination: string) => {
       const stat = lstatSync(resolve(source, path));
 
       if (stat.isSymbolicLink())
@@ -294,26 +343,33 @@ export class WorkflowInstaller {
 
       if (stat.isDirectory()) {
         for (const child of readdirSync(resolve(source, path)).sort())
-          copySkill(`${path}/${child}`);
+          copySkill(`${path}/${child}`, `${destination}/${child}`);
       } else {
         const content = WorkflowInstaller.read(source, path);
 
         if (!content) throw new Error(`Missing source: ${path}`);
 
-        desired.set(path.replace(/^ts\/skills\//, ".agents/skills/"), content);
+        desired.set(destination, content);
       }
     };
 
     for (const skill of [...installed].sort()) {
-      if (!WorkflowInstaller.read(source, `ts/skills/${skill}/SKILL.md`))
+      if (!WorkflowInstaller.read(source, `${skillSources[skill]}/SKILL.md`))
         throw new Error(`Missing skill: ${skill}`);
 
-      copySkill(`ts/skills/${skill}`);
+      copySkill(skillSources[skill], `.agents/skills/${skill}`);
     }
 
     if (configs) {
-      for (const name of ["biome.json", "tsconfig.base.json"]) {
-        const template = desired.get(`${bundle}/configs/${name}`);
+      const rootConfigs = [
+        ...(hasTypeScript ? ["biome.json", "tsconfig.base.json"] : []),
+        ...(hasRust ? ["rustfmt.toml"] : []),
+      ];
+
+      for (const name of rootConfigs) {
+        const template = desired.get(
+          `${name === "rustfmt.toml" ? guideRoots.rust : bundle}/configs/${name}`,
+        );
 
         if (!template) throw new Error(`Missing config template: ${name}`);
 
@@ -321,7 +377,7 @@ export class WorkflowInstaller {
       }
     }
 
-    if (oxlint) {
+    if (hasTypeScript && oxlint) {
       const template = desired.get(`${bundle}/configs/oxlint.json`);
 
       if (!template) throw new Error("Missing Oxlint config template");
@@ -373,8 +429,11 @@ export class WorkflowInstaller {
     // These siblings can supersede or conflict with the files we install.
     for (const path of [
       "AGENTS.override.md",
-      ...(configs ? ["biome.jsonc"] : []),
-      ...(oxlint ? [".oxlintrc.jsonc", "oxlint.config.ts", "oxlint.config.mts"] : []),
+      ...(configs && hasTypeScript ? ["biome.jsonc"] : []),
+      ...(configs && hasRust ? [".rustfmt.toml"] : []),
+      ...(hasTypeScript && oxlint
+        ? [".oxlintrc.jsonc", "oxlint.config.ts", "oxlint.config.mts"]
+        : []),
     ]) {
       const change = fileChange(path, null);
 
@@ -389,10 +448,20 @@ export class WorkflowInstaller {
 
     const instructions = [
       begin,
-      "## TypeScript workflow",
+      `## ${hasTypeScript ? (hasRust ? "TypeScript and Rust" : "TypeScript") : "Rust"} workflow`,
       "",
-      `For TypeScript work, read \`${bundle}/AGENTS.md\`.`,
-      `For runtime and stack work, read \`${bundle}/stacks.md\`.`,
+      ...(hasTypeScript
+        ? [
+            `For TypeScript work, read \`${bundle}/AGENTS.md\`.`,
+            `For runtime and stack work, read \`${bundle}/stacks.md\`.`,
+          ]
+        : []),
+      ...(hasRust
+        ? [
+            `For Rust work, read \`${guideRoots.rust}/AGENTS.md\` and its task-specific guides.`,
+            `For Rust runtime and target boundaries, read \`${guideRoots.rust}/stacks.md\`.`,
+          ]
+        : []),
       "Preserve this project's specific instructions and existing tooling.",
       end,
     ].join("\n");
@@ -538,7 +607,7 @@ if (import.meta.main) {
 
     if (values.help) {
       console.log(
-        `Usage: bun run scripts/install.ts <project> [options]\n\n--profile <names>  Comma-separated or repeated: ${Object.keys(profiles).join(", ")}\n--skills <names>   Extra skills: ${skills.join(", ")}\n--configs         Copy Biome and TypeScript base templates into the project root\n--oxlint          Enable the default spacing and shadcn lint config on an existing install\n--no-oxlint       Skip or remove the unedited managed root Oxlint config\n--no-biome        Omit Biome-only reference guidance\n--biome           Restore Biome reference guidance\n--dry-run         Preview without writing\n\nNew installs default to core with Oxlint. Omitted selections retain the last install.\nUse --skills none to clear extra skills. Profile changes remove unedited obsolete files.\nConflicts abort the entire install. No dependencies are installed.`,
+        `Usage: bun run scripts/install.ts <project> [options]\n\n--profile <names>  Comma-separated or repeated: ${Object.keys(profiles).join(", ")}\n--skills <names>   Extra skills: ${skills.join(", ")}\n--configs         Copy root templates: Biome/tsconfig for TypeScript, rustfmt for Rust\n--oxlint          Enable spacing/shadcn lint config (requires a TypeScript profile)\n--no-oxlint       Skip or remove the unedited managed root Oxlint config\n--no-biome        Omit Biome-only reference guidance for TypeScript\n--biome           Restore Biome reference guidance for TypeScript\n--dry-run         Preview without writing\n\nNew installs default to core with Oxlint. Rust-only profiles install no TypeScript tooling.\nCombine profiles, e.g. web,rust-native-wasm. Omitted selections retain the last install.\nUse --skills none to clear extra skills. Profile changes remove unedited obsolete files.\nCargo lint fragments require manual adoption; manifests and toolchains are not edited.\nConflicts abort the entire install. No dependencies are installed.`,
       );
     } else {
       if (positionals.length !== 1 || !positionals[0])

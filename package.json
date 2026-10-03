@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "test": "bun test scripts",
+    "test:rust": "bun run scripts/verify-rust.ts",
     "check-types": "tsc --noEmit",
     "lint": "oxlint scripts",
     "lint:fix": "oxlint scripts --fix"
