@@ -41,7 +41,7 @@ class SpacingTests(unittest.TestCase):
 
         environment = dict(os.environ)
         environment["CARGO_TARGET_DIR"] = str(LIBRARY / "target/consumers")
-        result = subprocess.run(command, capture_output=True, text=True, env=environment)
+        result = subprocess.run(command, cwd=LIBRARY, capture_output=True, text=True, env=environment)
         messages = []
 
         for line in result.stdout.splitlines():
@@ -157,6 +157,17 @@ macro_rules! authored {
         formatted = (self.root / 'src/lib.rs').read_text()
         self.assertEqual(self.lint(formatted)[0], [])
         self.assertEqual(self.lint(formatted, fix=True)[1], formatted)
+
+    def test_inline_fix_preserves_indentation_and_comments(self):
+        source = 'fn sample() {\n    let value = 1; /* keep this */ println!("{value}");\n}\n'
+        _, fixed = self.lint(source, fix=True)
+        self.assertIn('1; /* keep this */\n\n    println!', fixed)
+        self.assertEqual(self.lint(fixed)[0], [])
+
+        source = 'fn sample() {\n    let value = 1; println!("{value}");\n}\n'
+        _, fixed = self.lint(source, fix=True)
+        self.assertIn('1;\n\n    println!', fixed)
+        self.assertEqual(self.lint(fixed)[0], [])
 
     def test_crlf_and_unicode(self):
         source = 'fn sample() {\r\n    let café = 1;\r\n    println!("{café}");\r\n}\r\n'

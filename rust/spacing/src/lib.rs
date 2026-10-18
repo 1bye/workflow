@@ -167,7 +167,25 @@ impl EarlyLintPass for Spacing {
                 let replacement = if let Some(position) = gap.find('\n') {
                     format!("{}\n{}", &gap[..=position], &gap[position + 1..])
                 } else {
-                    format!("\n\n{gap}")
+                    let before = map.span_to_prev_source(previous.span).unwrap_or_default();
+                    let line_before = before.rsplit('\n').next().unwrap_or("");
+
+                    let indentation = if line_before.trim().is_empty() {
+                        line_before.to_owned()
+                    } else {
+                        format!(
+                            "{}    ",
+                            map.indentation_before(block.span).unwrap_or_default()
+                        )
+                    };
+
+                    let comment = if gap.trim().is_empty() {
+                        ""
+                    } else {
+                        gap.trim_end()
+                    };
+
+                    format!("{comment}\n\n{indentation}")
                 };
 
                 suggest(
