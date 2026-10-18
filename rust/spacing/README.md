@@ -1,7 +1,8 @@
 # Rust spacing
 
 `workflow_spacing` is a reusable Dylint library. It implements the spacing policy
-in [`ts/configs/oxlint.json`](../../ts/configs/oxlint.json) for Rust statements.
+in [`ts/configs/oxlint.json`](../../ts/configs/oxlint.json) for Rust statements,
+plus blank lines between Rust definitions and methods.
 It is development tooling, not a dependency of published application libraries.
 
 ## Rules
@@ -9,6 +10,7 @@ It is development tooling, not a dependency of published application libraries.
 | Lint | Policy |
 | --- | --- |
 | `statement_padding` | Require a blank line after `let`, except between consecutive single-line declarations. Require one before returns and around standalone control flow. |
+| `item_padding` | Require a blank line between definitions (`struct`, `enum`, `impl`, traits, functions, and methods), including nested definitions. |
 | `multiple_empty_lines` | At most one consecutive empty line; none at the beginning or end of a file. |
 | `padded_blocks` | No empty line immediately inside executable blocks or `match` bodies. |
 
@@ -16,6 +18,31 @@ Rust `match` corresponds to TS `switch`. `if`, `for`, `while`, `loop`, and `try`
 blocks follow the control-flow rule. A `let … else` is treated as a guard, and a
 block's final expression follows the return rule. Rust's `?` remains part of its
 expression; it does not introduce a separate statement like TS `throw`.
+
+Adjacent single-line imports, out-of-line module declarations, constants, statics,
+and type aliases may stay together within their own group. Definitions and methods
+always need separation, even if they fit on one line. Struct fields and enum variants
+remain compact. Documentation comments and attributes stay attached to their item.
+
+For example, the fixer turns adjacent definitions into:
+
+```rust
+struct Card {
+    width: f32,
+    height: f32,
+}
+
+impl Card {
+    fn width(&self) -> f32 {
+        self.width
+    }
+
+    /// Returns the card's height.
+    fn height(&self) -> f32 {
+        self.height
+    }
+}
+```
 
 Comments do not substitute for blank lines. Leading attributes stay attached to
 their statement. Literal contents, block-comment contents, and macro expansion

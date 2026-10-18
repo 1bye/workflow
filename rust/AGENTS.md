@@ -79,6 +79,9 @@ during focused changes; apply structural migrations only within the task's scope
 - Separate a final result expression or early return from preceding work when it
   marks a distinct result phase. Keep compact expression bodies compact; do not
   add `return` solely to satisfy a spacing convention.
+- Separate type definitions, implementations, functions, and methods with one
+  blank line. Keep documentation and attributes attached to their item; keep
+  struct fields and enum variants cohesive.
 - Keep chains and argument lists cohesive. Prefer a loop over a dense iterator
   chain when control flow or mutation is clearer. Avoid blank lines after every
   statement, artificial file-size limits, and generic `utils` dumping grounds.

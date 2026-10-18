@@ -1,4 +1,4 @@
-//! Conditional statement padding matching workflow's Oxlint spacing rules.
+//! Statement and definition padding extending workflow's Oxlint spacing rules.
 //!
 //! Runs before expansion: macro token trees and literal contents are left alone.
 //! Tail expressions follow the same padding rule as explicit returns.
@@ -12,7 +12,13 @@ extern crate rustc_lint;
 extern crate rustc_session;
 extern crate rustc_span;
 
-use rustc_ast::{Block, Crate, Expr, ExprKind, LocalKind, Stmt, StmtKind};
+use std::collections::HashMap;
+
+use rustc_ast::{
+    AssocItem, AssocItemKind, Block, Crate, Expr, ExprKind, Inline, Item, ItemKind, LocalKind,
+    ModKind, Stmt, StmtKind,
+};
+
 use rustc_errors::{Applicability, Diag, DiagDecorator};
 use rustc_lexer::{FrontmatterAllowed, TokenKind, tokenize};
 use rustc_lint::{EarlyContext, EarlyLintPass, LintContext};
@@ -29,6 +35,13 @@ declare_lint! {
 }
 
 declare_lint! {
+    /// Separate definitions and methods while preserving compact declaration groups.
+    pub ITEM_PADDING,
+    Warn,
+    "missing blank line between definitions"
+}
+
+declare_lint! {
     /// Allow at most one empty line and none at file boundaries.
     pub MULTIPLE_EMPTY_LINES,
     Warn,
@@ -42,16 +55,89 @@ declare_lint! {
     "empty line just inside a block"
 }
 
-impl_lint_pass!(Spacing => [STATEMENT_PADDING, MULTIPLE_EMPTY_LINES, PADDED_BLOCKS]);
+impl_lint_pass!(Spacing => [STATEMENT_PADDING, ITEM_PADDING, MULTIPLE_EMPTY_LINES, PADDED_BLOCKS]);
 
 #[derive(Default)]
-struct Spacing;
+struct Spacing {
+    pending_items: HashMap<BytePos, (Span, Span, Option<Span>)>,
+    previous_root_item: Option<ItemInfo>,
+    item_depth: usize,
+}
+
+struct ItemInfo {
+    span: Span,
+    with_attributes: Span,
+    group: Option<ItemGroup>,
+    single_line: bool,
+}
+
+impl Spacing {
+    fn remember_items<K>(
+        &mut self,
+        cx: &EarlyContext<'_>,
+        items: &[Box<Item<K>>],
+        parent: Option<Span>,
+        group: fn(&K) -> Option<ItemGroup>,
+    ) {
+        for pair in items.windows(2) {
+            self.remember_pair(cx, &pair[0], &pair[1], parent, group);
+        }
+    }
+
+    fn remember_pair<K>(
+        &mut self,
+        cx: &EarlyContext<'_>,
+        previous: &Item<K>,
+        next: &Item<K>,
+        parent: Option<Span>,
+        group: fn(&K) -> Option<ItemGroup>,
+    ) {
+        self.remember_boundary(
+            item_info(cx, previous, group),
+            item_info(cx, next, group),
+            parent,
+        );
+    }
+
+    fn remember_boundary(&mut self, previous: ItemInfo, next: ItemInfo, parent: Option<Span>) {
+        let compact = previous.group.is_some()
+            && previous.group == next.group
+            && previous.single_line
+            && next.single_line;
+
+        if !compact {
+            // Emit in the next item's callback so its allow/expect attributes apply.
+            self.pending_items.insert(
+                next.span.lo(),
+                (previous.span, next.with_attributes, parent),
+            );
+        }
+    }
+
+    fn check_item_padding<K>(&mut self, cx: &EarlyContext<'_>, item: &Item<K>) {
+        if let Some((previous, next, parent)) = self.pending_items.remove(&item.span.lo()) {
+            check_padding(
+                cx,
+                previous,
+                next,
+                parent,
+                ITEM_PADDING,
+                "insert a blank line between definitions",
+            );
+        }
+    }
+}
 
 /// Registers the shared spacing policy with Dylint's compiler driver.
 #[unsafe(no_mangle)]
 pub fn register_lints(_: &rustc_session::Session, store: &mut rustc_lint::LintStore) {
-    store.register_lints(&[STATEMENT_PADDING, MULTIPLE_EMPTY_LINES, PADDED_BLOCKS]);
-    store.register_pre_expansion_lint_pass(Box::new(|| Box::new(Spacing)));
+    store.register_lints(&[
+        STATEMENT_PADDING,
+        ITEM_PADDING,
+        MULTIPLE_EMPTY_LINES,
+        PADDED_BLOCKS,
+    ]);
+    store.register_pre_expansion_lint_pass(Box::new(|| Box::new(Spacing::default())));
 }
 
 impl EarlyLintPass for Spacing {
@@ -121,12 +207,51 @@ impl EarlyLintPass for Spacing {
         }
     }
 
+    fn check_item(&mut self, cx: &EarlyContext<'_>, item: &Item) {
+        // Loaded file modules start a fresh pre-expansion pass without check_crate.
+        if self.item_depth == 0 {
+            if let Some(previous) = self.previous_root_item.take() {
+                self.remember_boundary(previous, item_info(cx, item, item_group), None);
+            }
+
+            self.previous_root_item = Some(item_info(cx, item, item_group));
+        }
+
+        self.item_depth += 1;
+        self.check_item_padding(cx, item);
+
+        match &item.kind {
+            ItemKind::Mod(_, _, ModKind::Loaded(items, inline, _)) => {
+                let parent = matches!(inline, Inline::Yes).then_some(item.span);
+
+                self.remember_items(cx, items, parent, item_group);
+            }
+            ItemKind::Impl(implementation) => {
+                self.remember_items(cx, &implementation.items, Some(item.span), assoc_group);
+            }
+            ItemKind::Trait(definition) => {
+                self.remember_items(cx, &definition.items, Some(item.span), assoc_group);
+            }
+            _ => {}
+        }
+    }
+
+    fn check_item_post(&mut self, _: &EarlyContext<'_>, _: &Item) {
+        self.item_depth -= 1;
+    }
+
+    fn check_impl_item(&mut self, cx: &EarlyContext<'_>, item: &AssocItem) {
+        self.check_item_padding(cx, item);
+    }
+
+    fn check_trait_item(&mut self, cx: &EarlyContext<'_>, item: &AssocItem) {
+        self.check_item_padding(cx, item);
+    }
+
     fn check_block(&mut self, cx: &EarlyContext<'_>, block: &Block) {
         if block.span.from_expansion() {
             return;
         }
-
-        let map = cx.sess().source_map();
 
         check_edges(cx, block.span);
 
@@ -135,6 +260,11 @@ impl EarlyLintPass for Spacing {
             let next = &pair[1];
 
             if previous.span.from_expansion() || next.span.from_expansion() {
+                continue;
+            }
+
+            if let (StmtKind::Item(previous), StmtKind::Item(next)) = (&previous.kind, &next.kind) {
+                self.remember_pair(cx, previous, next, Some(block.span), item_group);
                 continue;
             }
 
@@ -154,50 +284,136 @@ impl EarlyLintPass for Spacing {
                 continue;
             }
 
-            let gap_span = previous
-                .span
-                .with_lo(previous.span.hi())
-                .with_hi(statement_span(next).lo());
-
-            let Ok(gap) = map.span_to_snippet(gap_span) else {
-                continue;
-            };
-
-            if !has_blank_line(&gap) {
-                let replacement = if let Some(position) = gap.find('\n') {
-                    format!("{}\n{}", &gap[..=position], &gap[position + 1..])
-                } else {
-                    let before = map.span_to_prev_source(previous.span).unwrap_or_default();
-                    let line_before = before.rsplit('\n').next().unwrap_or("");
-
-                    let indentation = if line_before.trim().is_empty() {
-                        line_before.to_owned()
-                    } else {
-                        format!(
-                            "{}    ",
-                            map.indentation_before(block.span).unwrap_or_default()
-                        )
-                    };
-
-                    let comment = if gap.trim().is_empty() {
-                        ""
-                    } else {
-                        gap.trim_end()
-                    };
-
-                    format!("{comment}\n\n{indentation}")
-                };
-
-                suggest(
-                    cx,
-                    STATEMENT_PADDING,
-                    gap_span,
-                    "insert a blank line between statements",
-                    replacement,
-                );
-            }
+            check_padding(
+                cx,
+                previous.span,
+                statement_span(next),
+                Some(block.span),
+                STATEMENT_PADDING,
+                "insert a blank line between statements",
+            );
         }
     }
+}
+
+#[derive(Clone, Copy, PartialEq)]
+enum ItemGroup {
+    Import,
+    Module,
+    Constant,
+    Static,
+    Type,
+}
+
+fn item_group(kind: &ItemKind) -> Option<ItemGroup> {
+    match kind {
+        ItemKind::Use(_) | ItemKind::ExternCrate(..) => Some(ItemGroup::Import),
+        ItemKind::Mod(_, _, ModKind::Unloaded | ModKind::Loaded(_, Inline::No { .. }, _)) => {
+            Some(ItemGroup::Module)
+        }
+        ItemKind::Const(_) => Some(ItemGroup::Constant),
+        ItemKind::Static(_) => Some(ItemGroup::Static),
+        ItemKind::TyAlias(_) => Some(ItemGroup::Type),
+        _ => None,
+    }
+}
+
+fn assoc_group(kind: &AssocItemKind) -> Option<ItemGroup> {
+    match kind {
+        AssocItemKind::Const(_) => Some(ItemGroup::Constant),
+        AssocItemKind::Type(_) => Some(ItemGroup::Type),
+        _ => None,
+    }
+}
+
+fn item_span<K>(item: &Item<K>) -> Span {
+    item.attrs.iter().fold(item.span, |span, attr| {
+        span.with_lo(span.lo().min(attr.span.lo()))
+    })
+}
+
+fn item_info<K>(
+    cx: &EarlyContext<'_>,
+    item: &Item<K>,
+    group: fn(&K) -> Option<ItemGroup>,
+) -> ItemInfo {
+    ItemInfo {
+        span: item.span,
+        with_attributes: item_span(item),
+        group: group(&item.kind),
+        single_line: cx
+            .sess()
+            .source_map()
+            .span_to_snippet(item.span)
+            .is_ok_and(|source| !source.contains('\n')),
+    }
+}
+
+fn check_padding(
+    cx: &EarlyContext<'_>,
+    previous: Span,
+    next: Span,
+    parent: Option<Span>,
+    lint: &'static rustc_session::lint::Lint,
+    message: &'static str,
+) {
+    if previous.from_expansion() || next.from_expansion() || previous.hi() > next.lo() {
+        return;
+    }
+
+    let map = cx.sess().source_map();
+    let gap_span = previous.with_lo(previous.hi()).with_hi(next.lo());
+
+    let Ok(gap) = map.span_to_snippet(gap_span) else {
+        return;
+    };
+
+    if has_blank_line(&gap) {
+        return;
+    }
+
+    let mut offset = 0;
+
+    let newline = tokenize(&gap, FrontmatterAllowed::No).find_map(|token| {
+        let end = offset + token.len as usize;
+
+        let position = if token.kind == TokenKind::Whitespace {
+            gap[offset..end]
+                .find('\n')
+                .map(|position| offset + position)
+        } else {
+            None
+        };
+
+        offset = end;
+
+        position
+    });
+
+    let replacement = if let Some(position) = newline {
+        format!("{}\n{}", &gap[..=position], &gap[position + 1..])
+    } else {
+        let before = map.span_to_prev_source(previous).unwrap_or_default();
+        let line_before = before.rsplit('\n').next().unwrap_or("");
+
+        let indentation = if line_before.trim().is_empty() {
+            line_before.to_owned()
+        } else if let Some(parent) = parent {
+            format!("{}    ", map.indentation_before(parent).unwrap_or_default())
+        } else {
+            String::new()
+        };
+
+        let comment = if gap.trim().is_empty() {
+            ""
+        } else {
+            gap.trim_end()
+        };
+
+        format!("{comment}\n\n{indentation}")
+    };
+
+    suggest(cx, lint, gap_span, message, replacement);
 }
 
 fn check_edges(cx: &EarlyContext<'_>, span: Span) {
