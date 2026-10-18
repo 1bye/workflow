@@ -82,8 +82,9 @@ during focused changes; apply structural migrations only within the task's scope
 - Keep chains and argument lists cohesive. Prefer a loop over a dense iterator
   chain when control flow or mutation is clearer. Avoid blank lines after every
   statement, artificial file-size limits, and generic `utils` dumping grounds.
-- Use stable rustfmt with the project's configuration. Logical statement padding
-  is a writing/review convention; rustfmt and the supplied lints do not enforce it.
+- Use stable rustfmt with the project's configuration. Stable rustfmt does not
+  enforce logical statement padding. Projects can adopt the shared Dylint spacing library in
+  `rust/spacing` to check the conditional spacing policy automatically.
 
 ## Verification
 

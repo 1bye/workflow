@@ -1,0 +1,18 @@
+[package]
+name = "workflow_spacing"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Statement spacing matching workflow's Oxlint policy"
+license = "MIT OR Apache-2.0"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+dylint_linting = "=6.2.0"
+
+[workspace]
+
+[package.metadata.rust-analyzer]
+rustc_private = true

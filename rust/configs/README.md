@@ -41,9 +41,11 @@ cargo fmt --all
 
 The second command changes files. Review its diff. Stable rustfmt does not provide
 ESLint-style conditional padding around statements. Its configurable blank-line
-bounds are unstable and do not implement that policy. Follow the baseline's logical
-spacing conventions while writing/reviewing; this workflow adds no regex rewriter
-or second Rust formatter.
+bounds are unstable and do not implement that policy. For enforced conditional
+spacing, adopt the shared
+[Dylint spacing library](https://github.com/1bye/workflow/tree/main/rust/spacing).
+It matches the Oxlint policy and pins a separate development-only nightly. The
+installer does not activate it or change the application's stable toolchain.
 
 ## Compiler and Clippy lints
 

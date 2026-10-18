@@ -7,7 +7,8 @@
     "test:rust": "bun run scripts/verify-rust.ts",
     "check-types": "tsc --noEmit",
     "lint": "oxlint scripts",
-    "lint:fix": "oxlint scripts --fix"
+    "lint:fix": "oxlint scripts --fix",
+    "test:spacing": "python3 rust/spacing/tests/test_spacing.py -v"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.3",
