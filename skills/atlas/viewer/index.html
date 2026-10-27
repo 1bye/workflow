@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atlas</title>
+<script src="https://cdn.jsdelivr.net/npm/elkjs@0.9.3/lib/elk.bundled.js"></script>
+<style>
+:root {
+  --bg: #f6f6f3; --surface: #ffffff; --ink: #1d1d1b; --muted: #6b6b66; --line: #d9d8d2;
+  --edge: #8a8a84; --accent: #e5532d;
+  --c-client: #2f6fdb; --c-service: #7a4fd0; --c-code: #2a8c7d; --c-data: #c47f14; --c-ext: #7d7d78;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #151514; --surface: #1f1f1d; --ink: #ecebe6; --muted: #9a9993; --line: #393935;
+    --edge: #8d8c86; --accent: #ff7a52;
+    --c-client: #6a9cf0; --c-service: #a585ec; --c-code: #4fb8a6; --c-data: #e2a443; --c-ext: #a3a39d;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #151514; --surface: #1f1f1d; --ink: #ecebe6; --muted: #9a9993; --line: #393935;
+  --edge: #8d8c86; --accent: #ff7a52;
+  --c-client: #6a9cf0; --c-service: #a585ec; --c-code: #4fb8a6; --c-data: #e2a443; --c-ext: #a3a39d;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; display: grid; grid-template-rows: auto 1fr auto; }
+header { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--surface); flex-wrap: wrap; }
+#crumbs { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; flex: 1; min-width: 0; font-weight: 600; }
+#crumbs a { color: var(--muted); text-decoration: none; cursor: pointer; }
+#crumbs a:hover { color: var(--ink); }
+#crumbs a:last-child { color: var(--ink); }
+#crumbs .sep { color: var(--line); }
+select, button { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+button:hover, select:hover { border-color: var(--muted); }
+main { display: grid; grid-template-columns: 1fr 320px; min-height: 0; }
+#stage { position: relative; min-height: 0; overflow: hidden; }
+svg#canvas { width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
+svg#canvas.dragging { cursor: grabbing; }
+aside { border-left: 1px solid var(--line); background: var(--surface); overflow: auto; padding: 16px; }
+aside h2 { margin: 2px 0 6px; font-size: 18px; }
+aside h3 { margin: 18px 0 6px; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+aside p { margin: 0 0 8px; }
+aside ul { list-style: none; margin: 0; padding: 0; }
+aside li { padding: 3px 0; }
+aside li a { color: var(--ink); cursor: pointer; text-decoration: none; border-bottom: 1px dotted var(--muted); }
+aside code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); word-break: break-all; }
+aside code a { color: inherit; }
+.tag { display: inline-block; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 6px; margin-right: 4px; }
+.tag.warn { color: var(--c-data); border-color: var(--c-data); }
+ol.steps { margin: 0; padding-left: 20px; }
+ol.steps li { padding: 3px 0; cursor: pointer; color: var(--muted); }
+ol.steps li.on { color: var(--ink); font-weight: 600; }
+#flowbar { display: none; align-items: center; gap: 10px; padding: 8px 16px; border-top: 1px solid var(--line); background: var(--surface); }
+#flowbar.on { display: flex; }
+#flowbar .txt { flex: 1; min-width: 0; }
+#flowbar label { color: var(--muted); display: flex; gap: 4px; align-items: center; }
+#notice { position: absolute; left: 16px; bottom: 12px; color: var(--muted); font-size: 12px; pointer-events: none; }
+.node rect { fill: color-mix(in oklab, var(--c) 10%, var(--surface)); stroke: color-mix(in oklab, var(--c) 55%, var(--surface)); stroke-width: 1.2; }
+.node { cursor: pointer; --c: var(--c-code); transition: opacity .2s; }
+.node.open rect { stroke-width: 1.8; }
+.node:hover rect { stroke: var(--c); }
+.node.sel rect { stroke: var(--ink); stroke-width: 2; }
+.node.ghost rect { fill: var(--bg); stroke: var(--line); stroke-dasharray: 5 4; }
+.node.inferred rect { stroke-dasharray: 3 3; }
+.node .k { font-size: 10px; letter-spacing: .07em; text-transform: uppercase; fill: var(--c); }
+.node .l { font-size: 14px; font-weight: 600; fill: var(--ink); }
+.node .p { font-size: 11px; fill: var(--muted); }
+.node .b { font-size: 11px; fill: var(--c); font-weight: 600; }
+.node.ghost .l { font-weight: 500; fill: var(--muted); }
+.kind-actor, .kind-client { --c: var(--c-client); }
+.kind-service, .kind-process { --c: var(--c-service); }
+.kind-db, .kind-store, .kind-queue { --c: var(--c-data); }
+.kind-external, .kind-group { --c: var(--c-ext); }
+.edge path { fill: none; stroke: var(--edge); stroke-width: 1.3; transition: opacity .2s; }
+.edge.inferred path { stroke-dasharray: 5 4; }
+.edge text { font-size: 11px; fill: var(--muted); }
+.edge rect { fill: var(--bg); }
+.dim { opacity: .18; }
+.arrow { fill: var(--edge); }
+.flow path { fill: none; stroke: var(--accent); stroke-width: 2.4; stroke-dasharray: 7 5; animation: march .6s linear infinite; }
+.flow circle { fill: var(--accent); }
+.flow rect { fill: var(--accent); }
+.flow text { fill: #fff; font-size: 12px; font-weight: 600; }
+.flow .arrowhead { fill: var(--accent); }
+.pulse rect { stroke: var(--accent) !important; stroke-width: 2.4 !important; animation: pulse 1s ease-in-out infinite; }
+@keyframes march { to { stroke-dashoffset: -12; } }
+@keyframes pulse { 50% { stroke-opacity: .35; } }
+@media (max-width: 760px) {
+  main { grid-template-columns: 1fr; grid-template-rows: 1fr 40%; }
+  aside { border-left: 0; border-top: 1px solid var(--line); }
+}
+</style>
+</head>
+<body>
+<header>
+  <nav id="crumbs"></nav>
+  <select id="flow" hidden></select>
+  <button id="theme" title="Toggle theme">◐</button>
+</header>
+<main>
+  <div id="stage">
+    <svg id="canvas">
+      <defs>
+        <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow" d="M0 0L10 5L0 10z"/></marker>
+        <marker id="farr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path class="arrowhead" d="M0 0L10 5L0 10z"/></marker>
+      </defs>
+      <g id="world"></g>
+    </svg>
+    <div id="notice"></div>
+  </div>
+  <aside id="panel"></aside>
+</main>
+<div id="flowbar">
+  <button id="prev">‹</button>
+  <button id="play">▶</button>
+  <button id="next">›</button>
+  <div class="txt" id="steptxt"></div>
+  <label><input type="checkbox" id="follow" checked> follow</label>
+</div>
+<script>
+const MODEL = /*__ATLAS_MODEL__*/null;
+const ROOT_DIR = /*__ATLAS_ROOT__*/null;
+const NS = "http://www.w3.org/2000/svg";
+const $ = (id) => document.getElementById(id);
+const svg = $("canvas"), world = $("world"), panel = $("panel");
+
+const root = { path: "", id: "", label: MODEL.title, kind: "group", desc: MODEL.desc, children: MODEL.nodes || [] };
+const byPath = new Map([["", root]]);
+(function index(n) {
+  for (const c of n.children || []) {
+    c.path = n.path ? n.path + "." + c.id : c.id;
+    c.parent = n;
+    byPath.set(c.path, c);
+    index(c);
+  }
+})(root);
+const edgesAll = MODEL.edges || [], flows = MODEL.flows || [];
+
+const parentOf = (p) => (p.includes(".") ? p.slice(0, p.lastIndexOf(".")) : "");
+const has = (a, p) => a === "" || p === a || p.startsWith(a + ".");
+const kids = (n) => n.children || [];
+
+// Map a node path to the node that stands for it on the canvas of `focus`.
+function proxy(p, focus) {
+  if (has(focus, p)) return p === focus ? null : (focus ? focus + "." : "") + p.slice(focus ? focus.length + 1 : 0).split(".")[0];
+  if (has(p, focus)) return null;
+  let q = p;
+  while (!has(parentOf(q), focus)) q = parentOf(q);
+  return q;
+}
+
+function buildLevel(focus, flow) {
+  const inside = kids(byPath.get(focus)).map((c) => c.path), insideSet = new Set(inside);
+  const ghosts = new Set(), merged = new Map();
+  const link = (a, b) => {
+    if (!a || !b || a === b) return null;
+    const ia = insideSet.has(a), ib = insideSet.has(b);
+    if (!ia && !ib) return null;
+    if (!ia) ghosts.add(a);
+    if (!ib) ghosts.add(b);
+    return true;
+  };
+  for (const e of edgesAll) {
+    const a = proxy(e.from, focus), b = proxy(e.to, focus);
+    if (!link(a, b)) continue;
+    const key = a < b ? a + "|" + b : b + "|" + a;
+    let m = merged.get(key);
+    if (!m) merged.set(key, (m = { s: a, t: b, fwd: false, back: false, labels: new Set(), n: 0, inferred: true }));
+    if (a === m.s || e.dir === "both") m.fwd = true;
+    if (a !== m.s || e.dir === "both") m.back = true;
+    if (e.label) m.labels.add(e.label);
+    m.n++;
+    if (!e.inferred) m.inferred = false;
+  }
+  if (flow) for (const s of flow.steps) link(proxy(s.from, focus), proxy(s.to, focus));
+  return { focus, inside, ghosts: [...ghosts], edges: [...merged.values()] };
+}
+
+// ---------- layout ----------
+const elk = window.ELK ? new ELK() : null;
+const cache = new Map();
+const charW = 7.4;
+function size(n, ghost) {
+  const label = n.label || n.id;
+  if (ghost) return { w: Math.max(130, label.length * charW + 28), h: 50 };
+  const prev = preview(n);
+  const w = Math.min(300, Math.max(150, label.length * 8.2 + 30, prev.length * 6.3 + 24));
+  return { w, h: kids(n).length ? 76 : 56 };
+}
+function preview(n) {
+  const c = kids(n);
+  if (!c.length) return "";
+  const names = c.slice(0, 3).map((x) => x.label);
+  return names.join(" · ") + (c.length > 3 ? " · +" + (c.length - 3) : "");
+}
+function edgeText(m) {
+  const l = [...m.labels];
+  if (!l.length) return m.n > 1 ? "×" + m.n : "";
+  return l.length <= 2 ? l.join(" · ") : l[0] + " · +" + (l.length - 1);
+}
+async function layout(level) {
+  const key = level.focus + "|" + level.ghosts.join(",");
+  if (cache.has(key)) return cache.get(key);
+  const items = [...level.inside.map((p) => ({ p, ghost: false })), ...level.ghosts.map((p) => ({ p, ghost: true }))];
+  const boxes = new Map(items.map(({ p, ghost }) => [p, { p, ghost, ...size(byPath.get(p), ghost) }]));
+  let result;
+  if (elk) {
+    const g = await elk.layout({
+      id: "root",
+      layoutOptions: {
+        "elk.algorithm": "layered", "elk.direction": "DOWN", "elk.edgeRouting": "ORTHOGONAL",
+        "elk.spacing.nodeNode": "36", "elk.layered.spacing.nodeNodeBetweenLayers": "64",
+        "elk.spacing.edgeLabel": "4", "elk.edgeLabels.placement": "CENTER", "elk.padding": "[top=24,left=24,bottom=24,right=24]",
+        "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
+      },
+      children: [...boxes.values()].map((b) => ({ id: b.p, width: b.w, height: b.h })),
+      edges: level.edges.map((m, i) => {
+        const t = edgeText(m);
+        return { id: "e" + i, sources: [m.s], targets: [m.t], labels: t ? [{ text: t, width: t.length * 6.2 + 10, height: 16 }] : [] };
+      }),
+    });
+    for (const c of g.children) Object.assign(boxes.get(c.id), { x: c.x, y: c.y });
+    const edges = g.edges.map((e, i) => {
+      const s = e.sections && e.sections[0];
+      const pts = s ? [s.startPoint, ...(s.bendPoints || []), s.endPoint] : null;
+      return { m: level.edges[i], pts, label: e.labels && e.labels[0] };
+    });
+    result = { boxes, edges, w: g.width, h: g.height };
+  } else {
+    const cols = Math.ceil(Math.sqrt(boxes.size));
+    let i = 0;
+    for (const b of boxes.values()) { b.x = 24 + (i % cols) * 320; b.y = 24 + Math.floor(i / cols) * 150; i++; }
+    result = { boxes, edges: level.edges.map((m) => ({ m, pts: null })), w: cols * 320 + 24, h: Math.ceil(boxes.size / cols) * 150 + 24 };
+    $("notice").textContent = "Layout engine unavailable (offline?) — using grid layout.";
+  }
+  cache.set(key, result);
+  return result;
+}
+
+// ---------- rendering ----------
+const el = (tag, attrs = {}, parent) => {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+};
+const state = { focus: "", sel: null, flow: null, step: 0, playing: null, view: { x: 0, y: 0, k: 1 }, layout: null, level: null };
+let overlayAnim = null;
+
+function applyView() {
+  const { x, y, k } = state.view;
+  world.setAttribute("transform", `translate(${x},${y}) scale(${k})`);
+}
+function fitView(L) {
+  const r = svg.getBoundingClientRect();
+  const k = Math.min(1.3, (r.width - 32) / L.w, (r.height - 32) / L.h);
+  return { k, x: (r.width - L.w * k) / 2, y: (r.height - L.h * k) / 2 };
+}
+function tween(to, ms, opacity) {
+  const from = { ...state.view }, o0 = +getComputedStyle(world).opacity;
+  return new Promise((done) => {
+    const t0 = performance.now();
+    const step = (t) => {
+      const p = Math.min(1, (t - t0) / ms), e = 1 - Math.pow(1 - p, 3);
+      for (const k of ["x", "y", "k"]) state.view[k] = from[k] + (to[k] - from[k]) * e;
+      if (opacity != null) world.style.opacity = o0 + (opacity - o0) * e;
+      applyView();
+      p < 1 ? requestAnimationFrame(step) : done();
+    };
+    requestAnimationFrame(step);
+  });
+}
+
+async function render(opts = {}) {
+  const flow = !$("follow").checked && state.flow ? state.flow : null;
+  const level = buildLevel(state.focus, flow);
+  const L = await layout(level);
+  state.level = level; state.layout = L;
+  world.textContent = "";
+  const gEdges = el("g", {}, world), gNodes = el("g", {}, world);
+  el("g", { id: "overlay" }, world);
+
+  for (const { m, pts, label } of L.edges) {
+    const g = el("g", { class: "edge" + (m.inferred ? " inferred" : ""), "data-s": m.s, "data-t": m.t }, gEdges);
+    let d;
+    if (pts) d = "M" + pts.map((p) => p.x + " " + p.y).join(" L");
+    else { const a = center(L.boxes.get(m.s)), b = center(L.boxes.get(m.t)); d = `M${a.x} ${a.y} L${b.x} ${b.y}`; }
+    const path = el("path", { d }, g);
+    if (m.fwd) path.setAttribute("marker-end", "url(#arr)");
+    if (m.back) path.setAttribute("marker-start", "url(#arr)");
+    if (label) {
+      el("rect", { x: label.x - 2, y: label.y, width: label.width + 4, height: label.height, rx: 3 }, g);
+      const t = el("text", { x: label.x + 5, y: label.y + 12 }, g);
+      t.textContent = label.text;
+    }
+  }
+  for (const b of L.boxes.values()) drawNode(gNodes, b);
+
+  if (opts.keepView) applyView();
+  else {
+    const fit = fitView(L);
+    if (opts.zoomIn) { state.view = { k: fit.k * 0.8, x: fit.x + (L.w * fit.k * 0.1), y: fit.y + (L.h * fit.k * 0.1) }; world.style.opacity = 0; applyView(); tween(fit, 260, 1); }
+    else { state.view = fit; world.style.opacity = 1; applyView(); }
+  }
+  crumbs(); renderPanel();
+  if (state.flow) showStep();
+}
+
+function center(b) { return { x: b.x + b.w / 2, y: b.y + b.h / 2 }; }
+function text(parent, cls, x, y, s) { const t = el("text", { class: cls, x, y }, parent); t.textContent = s; return t; }
+
+function drawNode(parent, b) {
+  const n = byPath.get(b.p), open = kids(n).length > 0;
+  const cls = ["node", "kind-" + n.kind, open && !b.ghost ? "open" : "", b.ghost ? "ghost" : "", n.inferred ? "inferred" : "", state.sel === b.p ? "sel" : ""];
+  const g = el("g", { class: cls.filter(Boolean).join(" "), transform: `translate(${b.x},${b.y})`, "data-p": b.p }, parent);
+  el("rect", { width: b.w, height: b.h, rx: 10 }, g);
+  const title = el("title", {}, g);
+  title.textContent = n.desc || n.label;
+  if (b.ghost) {
+    const where = parentOf(b.p);
+    text(g, "k", 12, 18, where ? "in " + byPath.get(where).label : "outside");
+    text(g, "l", 12, 37, n.label);
+  } else {
+    text(g, "k", 12, 19, n.kind);
+    text(g, "l", 12, 39, n.label);
+    if (open) {
+      text(g, "p", 12, 61, clip(preview(n), (b.w - 24) / 6.3));
+      const badge = text(g, "b", b.w - 12, 19, "⊞ " + kids(n).length);
+      badge.setAttribute("text-anchor", "end");
+    }
+  }
+  g.addEventListener("click", (ev) => {
+    if (dragMoved) return;
+    ev.stopPropagation();
+    if (b.ghost) return go(parentOf(b.p), b.p);
+    if (open) return drill(b);
+    select(b.p);
+  });
+}
+const clip = (s, n) => (s.length > n ? s.slice(0, Math.max(1, n - 1)) + "…" : s);
+
+function select(p) {
+  state.sel = p;
+  for (const g of world.querySelectorAll(".node")) g.classList.toggle("sel", g.dataset.p === p);
+  renderPanel();
+}
+
+async function drill(b) {
+  const r = svg.getBoundingClientRect(), k = state.view.k * Math.min(r.width / (b.w * state.view.k), r.height / (b.h * state.view.k)) * 0.9;
+  const c = center(b);
+  await tween({ k, x: r.width / 2 - c.x * k, y: r.height / 2 - c.y * k }, 260, 0);
+  go(b.p, null, true);
+}
+
+function go(focus, sel = null, zoomIn = false) {
+  state.sel = sel;
+  pendingZoom = zoomIn;
+  const hash = "#" + encodeURIComponent(focus);
+  if (location.hash === hash || (!focus && !location.hash)) render({ zoomIn });
+  else location.hash = hash;
+}
+let pendingZoom = false;
+window.addEventListener("hashchange", () => {
+  state.focus = readHash();
+  render({ zoomIn: pendingZoom });
+  pendingZoom = false;
+});
+function readHash() {
+  const p = decodeURIComponent(location.hash.slice(1));
+  return byPath.has(p) ? p : "";
+}
+
+function crumbs() {
+  const nav = $("crumbs");
+  nav.textContent = "";
+  const chain = [];
+  for (let p = state.focus; ; p = parentOf(p)) { chain.unshift(p); if (!p) break; }
+  chain.forEach((p, i) => {
+    if (i) { const s = document.createElement("span"); s.className = "sep"; s.textContent = "›"; nav.appendChild(s); }
+    const a = document.createElement("a");
+    a.textContent = byPath.get(p).label;
+    a.onclick = () => go(p);
+    nav.appendChild(a);
+  });
+  document.title = (state.focus ? byPath.get(state.focus).label + " · " : "") + MODEL.title + " · Atlas";
+}
+
+// ---------- panel ----------
+function h(tag, props = {}, ...children) {
+  const e = document.createElement(tag);
+  Object.assign(e, props);
+  for (const c of children) if (c != null) e.append(c);
+  return e;
+}
+function srcLink(s) {
+  const code = h("code");
+  if (ROOT_DIR) {
+    const m = s.match(/^(.*?)(?::(\d+))?$/);
+    code.append(h("a", { href: `vscode://file/${ROOT_DIR}/${m[1]}${m[2] ? ":" + m[2] : ""}`, textContent: s }));
+  } else code.textContent = s;
+  return h("li", {}, code);
+}
+const nodeLink = (p) => h("a", { textContent: byPath.get(p).label, onclick: () => reveal(p) });
+function reveal(p) {
+  const n = byPath.get(p);
+  kids(n).length ? go(p) : go(parentOf(p), p);
+}
+
+function renderPanel() {
+  panel.textContent = "";
+  if (state.flow) {
+    const f = state.flow;
+    panel.append(h("h3", { textContent: "Flow" }), h("p", {}, h("strong", { textContent: f.label })));
+    const ol = h("ol", { className: "steps" });
+    f.steps.forEach((s, i) => {
+      ol.append(h("li", { className: i === state.step ? "on" : "", textContent: `${byPath.get(s.from).label} → ${byPath.get(s.to).label}${s.label ? ": " + s.label : ""}`, onclick: () => setStep(i) }));
+    });
+    panel.append(ol);
+  }
+  const p = state.sel ?? state.focus, n = byPath.get(p);
+  const tags = h("div", {}, h("span", { className: "tag", textContent: p ? n.kind : "system" }), n.inferred ? h("span", { className: "tag warn", textContent: "inferred" }) : null);
+  panel.append(h("h3", { textContent: state.sel ? "Selected" : "Viewing" }), tags, h("h2", { textContent: n.label }));
+  if (n.desc) panel.append(h("p", { textContent: n.desc }));
+  if (state.sel && kids(n).length) panel.append(h("button", { textContent: "Open ›", onclick: () => go(p) }));
+  if (n.src && n.src.length) panel.append(h("h3", { textContent: "Source" }), h("ul", {}, ...n.src.map(srcLink)));
+  if (kids(n).length) {
+    panel.append(h("h3", { textContent: `Contains (${kids(n).length})` }), h("ul", {}, ...kids(n).map((c) => h("li", {}, nodeLink(c.path), kids(c).length ? " ⊞" : ""))));
+  }
+  if (p) {
+    const out = [], inn = [];
+    for (const e of edgesAll) {
+      const fi = has(p, e.from), ti = has(p, e.to);
+      if (fi && !ti) out.push(e); else if (ti && !fi) inn.push(e);
+    }
+    const row = (e, other, arrow) => h("li", {}, arrow + " ", nodeLink(other), e.label ? h("span", { textContent: " · " + e.label }) : null, e.inferred ? h("span", { className: "tag warn", textContent: "inferred", style: "margin-left:6px" }) : null);
+    if (out.length) panel.append(h("h3", { textContent: "Outgoing" }), h("ul", {}, ...out.slice(0, 15).map((e) => row(e, e.to, "→"))));
+    if (inn.length) panel.append(h("h3", { textContent: "Incoming" }), h("ul", {}, ...inn.slice(0, 15).map((e) => row(e, e.from, "←"))));
+  }
+}
+
+// ---------- flows ----------
+function lca(a, b) {
+  const x = a.split("."), y = b.split("."), c = [];
+  for (let i = 0; i < Math.min(x.length, y.length) && x[i] === y[i]; i++) c.push(x[i]);
+  let p = c.join(".");
+  if (p === a || p === b) p = parentOf(p);
+  return p;
+}
+function setFlow(id) {
+  stopPlay();
+  state.flow = flows.find((f) => f.id === id) || null;
+  state.step = 0;
+  $("flowbar").classList.toggle("on", !!state.flow);
+  cache.clear();
+  if (state.flow && $("follow").checked) {
+    const s = state.flow.steps[0], target = lca(s.from, s.to);
+    if (target !== state.focus) return go(target);
+  }
+  render({ keepView: true });
+}
+function setStep(i) {
+  const f = state.flow;
+  state.step = Math.max(0, Math.min(f.steps.length - 1, i));
+  const s = f.steps[state.step];
+  if ($("follow").checked) {
+    const target = lca(s.from, s.to);
+    if (target !== state.focus) return go(target);
+  }
+  renderPanel();
+  showStep();
+}
+function showStep() {
+  const f = state.flow, s = f.steps[state.step], L = state.layout;
+  const a = proxy(s.from, state.focus), b = proxy(s.to, state.focus);
+  $("steptxt").textContent = `${state.step + 1}/${f.steps.length} · ${byPath.get(s.from).label} → ${byPath.get(s.to).label}${s.label ? ": " + s.label : ""}`;
+  const overlay = $("overlay");
+  overlay.textContent = "";
+  if (overlayAnim) cancelAnimationFrame(overlayAnim);
+  const ba = a && L.boxes.get(a), bb = b && L.boxes.get(b);
+  for (const g of world.querySelectorAll(".node")) {
+    const on = g.dataset.p === a || g.dataset.p === b;
+    g.classList.toggle("dim", !on);
+    g.classList.toggle("pulse", on && a === b);
+  }
+  for (const g of world.querySelectorAll(".edge")) g.classList.add("dim");
+  if (!ba || !bb || a === b) return;
+  const p0 = edgePoint(ba, center(bb)), p1 = edgePoint(bb, center(ba));
+  const mx = (p0.x + p1.x) / 2, my = (p0.y + p1.y) / 2, dx = p1.x - p0.x, dy = p1.y - p0.y;
+  const c = { x: mx - dy * 0.18, y: my + dx * 0.18 };
+  const g = el("g", { class: "flow" }, overlay);
+  const path = el("path", { d: `M${p0.x} ${p0.y} Q${c.x} ${c.y} ${p1.x} ${p1.y}`, "marker-end": "url(#farr)" }, g);
+  const dot = el("circle", { r: 5 }, g);
+  if (s.label) {
+    const lx = (p0.x + 2 * c.x + p1.x) / 4, ly = (p0.y + 2 * c.y + p1.y) / 4, w = s.label.length * 6.8 + 16;
+    el("rect", { x: lx - w / 2, y: ly - 11, width: w, height: 22, rx: 11 }, g);
+    const t = text(g, "", lx, ly + 4, s.label);
+    t.setAttribute("text-anchor", "middle");
+  }
+  const len = path.getTotalLength(), t0 = performance.now();
+  const tick = (t) => {
+    const pt = path.getPointAtLength(((t - t0) % 1400) / 1400 * len);
+    dot.setAttribute("cx", pt.x); dot.setAttribute("cy", pt.y);
+    overlayAnim = requestAnimationFrame(tick);
+  };
+  overlayAnim = requestAnimationFrame(tick);
+}
+function edgePoint(b, toward) {
+  const c = center(b), dx = toward.x - c.x, dy = toward.y - c.y;
+  const s = Math.min(Math.abs((b.w / 2 + 4) / (dx || 1e-9)), Math.abs((b.h / 2 + 4) / (dy || 1e-9)));
+  return { x: c.x + dx * s, y: c.y + dy * s };
+}
+function stopPlay() { clearInterval(state.playing); state.playing = null; $("play").textContent = "▶"; }
+function togglePlay() {
+  if (state.playing) return stopPlay();
+  if (state.step >= state.flow.steps.length - 1) setStep(0);
+  $("play").textContent = "❚❚";
+  state.playing = setInterval(() => (state.step >= state.flow.steps.length - 1 ? stopPlay() : setStep(state.step + 1)), 1800);
+}
+
+// ---------- input ----------
+let drag = null, dragMoved = false;
+svg.addEventListener("pointerdown", (e) => { drag = { x: e.clientX, y: e.clientY, v: { ...state.view } }; dragMoved = false; });
+svg.addEventListener("pointermove", (e) => {
+  if (!drag) return;
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  if (!dragMoved && Math.hypot(dx, dy) < 4) return;
+  if (!dragMoved) { dragMoved = true; svg.setPointerCapture(e.pointerId); svg.classList.add("dragging"); }
+  state.view.x = drag.v.x + dx; state.view.y = drag.v.y + dy; applyView();
+});
+svg.addEventListener("pointerup", () => { drag = null; svg.classList.remove("dragging"); setTimeout(() => (dragMoved = false)); });
+svg.addEventListener("click", () => { if (!dragMoved && state.sel) select(null); });
+svg.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  const r = svg.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top, v = state.view;
+  const k = Math.max(0.15, Math.min(4, v.k * Math.exp(-e.deltaY * 0.0015)));
+  state.view = { k, x: mx - (mx - v.x) * (k / v.k), y: my - (my - v.y) * (k / v.k) };
+  applyView();
+}, { passive: false });
+window.addEventListener("keydown", (e) => {
+  if (e.target.tagName === "SELECT") return;
+  if (e.key === "Escape") state.sel ? select(null) : state.focus && go(parentOf(state.focus), state.focus);
+  if (!state.flow) return;
+  if (e.key === "ArrowRight") setStep(state.step + 1);
+  if (e.key === "ArrowLeft") setStep(state.step - 1);
+  if (e.key === " ") { e.preventDefault(); togglePlay(); }
+});
+window.addEventListener("resize", () => state.layout && render());
+
+$("prev").onclick = () => setStep(state.step - 1);
+$("next").onclick = () => setStep(state.step + 1);
+$("play").onclick = togglePlay;
+$("follow").onchange = () => { cache.clear(); setFlow(state.flow && state.flow.id); };
+$("theme").onclick = () => {
+  const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+  const cur = document.documentElement.dataset.theme || (dark ? "dark" : "light");
+  document.documentElement.dataset.theme = cur === "dark" ? "light" : "dark";
+  try { localStorage.setItem("atlas-theme", document.documentElement.dataset.theme); } catch {}
+};
+try { const t = localStorage.getItem("atlas-theme"); if (t) document.documentElement.dataset.theme = t; } catch {}
+
+if (flows.length) {
+  const sel = $("flow");
+  sel.hidden = false;
+  sel.append(h("option", { value: "", textContent: "Flows…" }), ...flows.map((f) => h("option", { value: f.id, textContent: f.label })));
+  sel.onchange = () => setFlow(sel.value);
+}
+state.focus = readHash();
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,78 @@
+{
+  "title": "OnBot",
+  "desc": "Example atlas built from docs/plan/01-architecture.md only; no code was read.",
+  "nodes": [
+    { "id": "web", "label": "Web client", "kind": "client", "desc": "TanStack Start client for user input and rendering." },
+    { "id": "desktop", "label": "Desktop client", "kind": "client", "desc": "Desktop shell; also hosts the environment companion." },
+    {
+      "id": "host", "label": "OnBot host", "kind": "group", "desc": "Everything that runs on the OnBot server machine.",
+      "children": [
+        {
+          "id": "relay", "label": "Relay", "kind": "service", "desc": "Owns shared records, routing, grants, run admission, configuration and supervision.",
+          "children": [
+            { "id": "coordinator", "label": "Coordinator", "kind": "module", "desc": "Application operations and durable scheduling." },
+            { "id": "supervisor", "label": "Bot supervisor", "kind": "module", "desc": "OS process management and worker ownership." },
+            { "id": "registry", "label": "Registry", "kind": "module", "desc": "Validated immutable plugin and skill artifacts and path resolution." },
+            { "id": "env-service", "label": "Environment service", "kind": "module", "desc": "Brokers operations to environments on this or other machines." }
+          ]
+        },
+        { "id": "db", "label": "Application DB", "kind": "db", "desc": "SQLite store for messages, runs, receipts and events." },
+        {
+          "id": "bot", "label": "Bot worker ×N", "kind": "process", "desc": "One OS process per logical bot.",
+          "children": [
+            { "id": "runtime", "label": "Worker runtime", "kind": "module", "desc": "Speaks the local worker protocol and forwards scoped operations." },
+            { "id": "engine", "label": "Pi engine", "kind": "module", "desc": "Agent engine and model loop behind an OnBot service boundary." },
+            { "id": "plugins", "label": "Plugins", "kind": "module", "desc": "Extension instances that contribute tools through the SDK." },
+            { "id": "storage", "label": "Private storage", "kind": "store", "desc": "Engine checkpoints and private transcripts." }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "envs", "label": "Environments", "kind": "group", "desc": "Machines where tools touch real resources.",
+      "children": [
+        { "id": "companion", "label": "Desktop companion", "kind": "process" },
+        { "id": "remote", "label": "Server or VM", "kind": "external" },
+        { "id": "local", "label": "Host executor", "kind": "module" }
+      ]
+    }
+  ],
+  "edges": [
+    { "from": "web", "to": "host.relay.coordinator", "label": "commands · events", "dir": "both" },
+    { "from": "desktop", "to": "host.relay.coordinator", "label": "commands · events", "dir": "both" },
+    { "from": "host.relay.coordinator", "to": "host.db", "label": "commit" },
+    { "from": "host.relay.coordinator", "to": "host.relay.supervisor", "label": "assign runs" },
+    { "from": "host.relay.coordinator", "to": "host.relay.env-service", "label": "environment ops" },
+    { "from": "host.relay.supervisor", "to": "host.bot.runtime", "label": "worker protocol", "dir": "both" },
+    { "from": "host.bot.runtime", "to": "host.relay.coordinator", "label": "shared operations" },
+    { "from": "host.relay.registry", "to": "host.bot.plugins", "label": "immutable paths", "inferred": true },
+    { "from": "host.bot.runtime", "to": "host.bot.engine", "label": "submit run", "dir": "both" },
+    { "from": "host.bot.engine", "to": "host.bot.plugins", "label": "tool calls" },
+    { "from": "host.bot.engine", "to": "host.bot.storage", "label": "checkpoints" },
+    { "from": "host.relay.env-service", "to": "envs.companion", "label": "environment protocol", "dir": "both" },
+    { "from": "host.relay.env-service", "to": "envs.remote", "label": "SSH / paired", "dir": "both" },
+    { "from": "host.relay.env-service", "to": "envs.local", "label": "local adapter" }
+  ],
+  "flows": [
+    {
+      "id": "post-message",
+      "label": "User message → AI reply",
+      "steps": [
+        { "from": "web", "to": "host.relay.coordinator", "label": "post message" },
+        { "from": "host.relay.coordinator", "to": "host.db", "label": "commit message + run" },
+        { "from": "host.relay.coordinator", "to": "web", "label": "accepted receipt" },
+        { "from": "host.relay.coordinator", "to": "host.relay.supervisor", "label": "assign run" },
+        { "from": "host.relay.supervisor", "to": "host.bot.runtime", "label": "run + config" },
+        { "from": "host.bot.runtime", "to": "host.bot.engine", "label": "submit run + tools" },
+        { "from": "host.bot.engine", "to": "host.bot.plugins", "label": "call tool" },
+        { "from": "host.bot.runtime", "to": "host.relay.coordinator", "label": "scoped operation" },
+        { "from": "host.relay.coordinator", "to": "host.relay.env-service", "label": "execute" },
+        { "from": "host.relay.env-service", "to": "envs.companion", "label": "run on desktop" },
+        { "from": "host.bot.engine", "to": "host.bot.runtime", "label": "conversation.post" },
+        { "from": "host.bot.runtime", "to": "host.relay.coordinator", "label": "publish" },
+        { "from": "host.relay.coordinator", "to": "host.db", "label": "commit reply" },
+        { "from": "host.relay.coordinator", "to": "web", "label": "publication event" }
+      ]
+    }
+  ]
+}

@@ -37,6 +37,7 @@ export const skillSources = {
   "vercel-composition-patterns": "ts/skills/vercel-composition-patterns",
   shadcn: "ts/skills/shadcn",
   "rust-development": "rust/skills/rust-development",
+  atlas: "skills/atlas",
 } as const;
 
 export type Profile = keyof typeof profiles;
