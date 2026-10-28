@@ -17,6 +17,7 @@ Personal TypeScript and Rust conventions and reusable instructions for AI coding
 | [rust/stacks.md](rust/stacks.md) | Library, CLI, async, native/WASM, and workspace profiles |
 | [rust/configs/README.md](rust/configs/README.md) | Stable rustfmt template, Cargo lint fragment, and adoption commands |
 | [rust/skills/rust-development/](rust/skills/rust-development/) | Rust skill with ownership and refactoring references |
+| [skills/atlas/](skills/atlas/) | Language-agnostic skill that maps a system into a nested drill-down HTML canvas |
 | [scripts/install.ts](scripts/install.ts) | Bun installer with previews, profile selection, and conflict checks |
 
 ## Install in a project

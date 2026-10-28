@@ -1,0 +1,1122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atlas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300..600&family=Geist+Mono&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/elkjs@0.9.3/lib/elk.bundled.js"></script>
+<style>
+:root {
+  --bg: #f2f2f2; --surface: #ffffff; --ink: #141414; --soft: #474747; --muted: #6b6b6b; --line: #dcdcdc;
+  --edge: #a6a6a6; --accent: #141414; --glass: rgb(255 255 255 / .6);
+  --c-client: #4a82d8; --c-service: #7c5cd6; --c-code: #e07a3f; --c-data: #2e9e6a; --c-ext: #8c8c8c;
+  --sans: "Geist", ui-sans-serif, system-ui, sans-serif; --mono: "Geist Mono", ui-monospace, Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141414; --surface: #1c1c1c; --ink: #ededed; --soft: #c7c7c7; --muted: #949494; --line: #2e2e2e;
+    --edge: #5c5c5c; --accent: #ededed; --glass: rgb(255 255 255 / .05);
+    --c-client: #6f9ee6; --c-service: #a08af0; --c-code: #f0915a; --c-data: #4cc28a; --c-ext: #9a9a9a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141414; --surface: #1c1c1c; --ink: #ededed; --soft: #c7c7c7; --muted: #949494; --line: #2e2e2e;
+  --edge: #5c5c5c; --accent: #ededed; --glass: rgb(255 255 255 / .05);
+  --c-client: #6f9ee6; --c-service: #a08af0; --c-code: #f0915a; --c-data: #4cc28a; --c-ext: #9a9a9a;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.45 var(--sans); overflow: hidden; -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: var(--soft); background: none; border: 0; padding: 0; cursor: pointer; }
+button:hover { color: var(--ink); }
+button:focus-visible { outline: 1px solid var(--ink); outline-offset: 2px; }
+button:disabled { cursor: default; opacity: .35; }
+[hidden] { display: none !important; }
+main, #stage { width: 100%; height: 100%; }
+#stage { position: relative; overflow: hidden; }
+svg#canvas { width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
+svg#canvas.dragging { cursor: grabbing; }
+#crumbs { position: absolute; top: 18px; left: 24px; display: flex; align-items: baseline; gap: 10px; font-size: 20px; letter-spacing: -.01em; }
+#crumbs button { font-size: inherit; color: var(--muted); }
+#crumbs button:hover { color: var(--ink); }
+#crumbs .sep { color: var(--muted); font-weight: 300; }
+#crumbs .here { color: var(--ink); }
+#controls { position: absolute; top: 14px; right: 16px; display: flex; gap: 2px; }
+#controls button { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; }
+#controls button:hover { background: var(--glass); }
+#controls svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+#scenario-dock { --card-w: 232px; position: absolute; left: 0; right: 0; bottom: 12px; pointer-events: none; }
+#scenario-track { display: flex; gap: 10px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; padding: 12px 24px; pointer-events: auto; scroll-snap-type: x proximity; }
+#scenario-track::-webkit-scrollbar { display: none; }
+#scenario-track.scenario-list { justify-content: safe center; }
+#scenario-track.step-list { padding-inline: max(24px, calc(50% - var(--card-w) / 2)); }
+.scenario-card { flex: 0 0 var(--card-w); min-height: 84px; padding: 12px 14px; text-align: left; border-radius: 14px; background: var(--glass); backdrop-filter: blur(8px); scroll-snap-align: center; transition: opacity .2s ease, background-color .2s ease, box-shadow .2s ease; }
+.scenario-card:hover { background: var(--surface); }
+.scenario-card .eyebrow { display: block; font: 10px/1 var(--mono); color: var(--muted); margin-bottom: 8px; }
+.scenario-card strong { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-size: 13px; font-weight: 500; line-height: 1.4; color: var(--ink); }
+.scenario-card .detail { display: block; margin-top: 6px; font-size: 11px; line-height: 1.4; color: var(--muted); }
+.back-card { background: transparent; }
+.step-card { opacity: .55; }
+.step-card.active { opacity: 1; background: var(--surface); box-shadow: 0 0 0 1px var(--ink); }
+#notice { position: absolute; left: 24px; bottom: 120px; color: var(--muted); font: 11px var(--mono); pointer-events: none; }
+.node { cursor: pointer; --c: var(--c-code); transition: opacity .2s; }
+.node > .outline { fill: color-mix(in oklab, var(--c) 9%, var(--bg)); stroke: none; transition: fill .15s; }
+.node:hover > .outline { fill: color-mix(in oklab, var(--c) 14%, var(--bg)); }
+.node.sel > .outline { stroke: var(--ink); stroke-width: 1; }
+.node.frame > .outline, .node.frame:hover > .outline { fill: var(--glass); }
+.node.section > .outline { fill: color-mix(in oklab, var(--c) 9%, var(--surface)); }
+.node.section:hover > .outline { fill: color-mix(in oklab, var(--c) 14%, var(--surface)); }
+.node.inferred > .outline { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 4 3; }
+.node .icon { fill: none; stroke: var(--c); stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+.node .halo { fill: color-mix(in oklab, var(--c) 9%, var(--bg)); transition: fill .15s; }
+.node:hover .halo { fill: color-mix(in oklab, var(--c) 14%, var(--bg)); }
+.node.sel .halo { stroke: var(--ink); stroke-width: 1; }
+.node.ghost { opacity: .6; }
+.node.ghost:hover { opacity: .8; }
+.node.inferred .icon { stroke-dasharray: 3 2; }
+.node .l { font-size: 13px; font-weight: 500; fill: var(--ink); }
+.node .bare-l { font-size: 12px; font-weight: 400; fill: var(--soft); }
+.node .k { font: 10px var(--mono); fill: var(--muted); }
+.node .p { font-size: 12px; fill: var(--soft); }
+.container-heading { cursor: pointer; outline: none; }
+.open-btn circle { fill: var(--surface); transition: fill .15s; }
+.open-btn path { fill: none; stroke: var(--ink); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; transition: stroke .15s; }
+.container-heading:hover .open-btn circle, .container-heading:focus-visible .open-btn circle { fill: var(--ink); }
+.container-heading:hover .open-btn path, .container-heading:focus-visible .open-btn path { stroke: var(--bg); }
+.container-heading:focus-visible .heading-hit { stroke: var(--ink); stroke-width: 1; }
+.tile .outline { fill: var(--surface); stroke: none; }
+.tile text { font-size: 12px; fill: var(--ink); }
+.node .or { font: 10px var(--mono); fill: var(--muted); }
+.kind-actor, .kind-client { --c: var(--c-client); }
+.kind-service, .kind-process { --c: var(--c-service); }
+.kind-db, .kind-store, .kind-queue { --c: var(--c-data); }
+.kind-external, .kind-group { --c: var(--c-ext); }
+.edge path { fill: none; stroke: var(--edge); stroke-width: 1.25; stroke-linecap: round; stroke-linejoin: round; transition: opacity .2s; }
+.edge.inferred path { stroke-dasharray: 4 3; }
+.edge text { font: 10px var(--mono); fill: var(--soft); text-anchor: middle; dominant-baseline: central; }
+.edge rect { fill: var(--bg); }
+.dim { opacity: .15; }
+.node.ghost.dim { opacity: .1; }
+.arrow { fill: var(--edge); }
+.flow path { fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 4 4; animation: march .6s linear infinite; }
+.flow circle { fill: var(--accent); }
+.flow rect { fill: var(--accent); }
+.flow text { fill: var(--bg); font: 10px var(--mono); }
+.flow .arrowhead { fill: var(--accent); }
+.pulse > .outline { stroke: var(--accent) !important; stroke-width: 1; animation: pulse 1s ease-in-out infinite; }
+.pulse .halo { fill: color-mix(in oklab, var(--c) 18%, transparent); animation: pulse 1s ease-in-out infinite; }
+@keyframes march { to { stroke-dashoffset: -8; } }
+@keyframes pulse { 50% { opacity: .4; } }
+@media (max-width: 760px) {
+  #scenario-dock { --card-w: 208px; bottom: 6px; }
+  #crumbs { font-size: 16px; left: 16px; }
+}
+@media (prefers-reduced-motion: reduce) { .scenario-card, .node, .edge path { transition: none; } .flow path { animation: none; } }
+</style>
+</head>
+<body>
+<main>
+  <div id="stage">
+    <svg id="canvas">
+      <defs>
+        <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="arrow" d="M0 0L10 5L0 10z"/></marker>
+        <marker id="farr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path class="arrowhead" d="M0 0L10 5L0 10z"/></marker>
+      </defs>
+      <g id="world"></g>
+    </svg>
+    <div id="notice"></div>
+    <nav id="crumbs" aria-label="Canvas navigation"></nav>
+    <div id="controls">
+      <button id="zoom-in" aria-label="Zoom in"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+      <button id="zoom-out" aria-label="Zoom out"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+      <button id="zoom-fit" aria-label="Fit to screen"><svg viewBox="0 0 24 24"><path d="M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4"/></svg></button>
+      <button id="theme" aria-label="Toggle theme"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg></button>
+    </div>
+    <section id="scenario-dock" aria-label="Flow scenarios" hidden>
+      <div id="scenario-track" role="group" aria-label="Scenarios"></div>
+    </section>
+  </div>
+</main>
+<script>
+const MODEL = /*__ATLAS_MODEL__*/null;
+const ROOT_DIR = /*__ATLAS_ROOT__*/null;
+const NS = "http://www.w3.org/2000/svg";
+const $ = (id) => document.getElementById(id);
+const svg = $("canvas"), world = $("world");
+
+const root = { path: "", id: "", label: MODEL.title, kind: "group", desc: MODEL.desc, children: MODEL.nodes || [] };
+const byPath = new Map([["", root]]);
+(function index(n) {
+  for (const c of n.children || []) {
+    c.path = n.path ? n.path + "." + c.id : c.id;
+    c.parent = n;
+    byPath.set(c.path, c);
+    index(c);
+  }
+})(root);
+const edgesAll = MODEL.edges || [], flows = MODEL.flows || [];
+
+const parentOf = (p) => (p.includes(".") ? p.slice(0, p.lastIndexOf(".")) : "");
+const has = (a, p) => a === "" || p === a || p.startsWith(a + ".");
+const kids = (n) => n.children || [];
+const display = (n) => n.display || "box";
+const expanded = (p) => ["frame", "sections"].includes(display(byPath.get(p))) && kids(byPath.get(p)).length > 0;
+const tagged = (n) => ["chips", "choice"].includes(display(n)) && kids(n).length > 0;
+const drillable = (n) => kids(n).length > 0 && buildLevel(n.path, null).edges.some((e) => has(n.path, e.s) && has(n.path, e.t));
+const copies = (n) => (n.count === "many" ? 3 : Math.min(3, n.count || 1));
+const childOn = (a, p) => (a ? a + "." : "") + p.slice(a ? a.length + 1 : 0).split(".")[0];
+
+// Map a node path to the node that stands for it on the canvas of `focus`.
+function proxy(p, focus) {
+  if (has(focus, p)) {
+    if (p === focus) return null;
+    let q = childOn(focus, p);
+    while (q !== p && expanded(q)) q = childOn(q, p);
+    return q;
+  }
+  if (has(p, focus)) return null;
+  let q = p;
+  while (!has(parentOf(q), focus)) q = parentOf(q);
+  return q;
+}
+
+function buildLevel(focus, flow) {
+  const ghosts = new Set(), merged = new Map();
+  const link = (a, b) => {
+    if (!a || !b || has(a, b) || has(b, a)) return false;
+    const ia = has(focus, a), ib = has(focus, b);
+    if (!ia && !ib) return false;
+    if (!ia) ghosts.add(a);
+    if (!ib) ghosts.add(b);
+    return true;
+  };
+  for (const e of edgesAll) {
+    const a = proxy(e.from, focus), b = proxy(e.to, focus);
+    if (!link(a, b)) continue;
+    const key = a < b ? a + "|" + b : b + "|" + a;
+    let m = merged.get(key);
+    if (!m) merged.set(key, (m = { s: a, t: b, fwd: false, back: false, labels: new Set(), n: 0, inferred: true }));
+    if (a === m.s || e.dir === "both") m.fwd = true;
+    if (a !== m.s || e.dir === "both") m.back = true;
+    if (e.label) m.labels.add(e.label);
+    m.n++;
+    if (!e.inferred) m.inferred = false;
+  }
+  if (flow) for (const s of flow.steps) link(proxy(s.from, focus), proxy(s.to, focus));
+  return { focus, ghosts: [...ghosts], edges: [...merged.values()] };
+}
+
+// ---------- sizing ----------
+const headerH = 34, tileH = 28, tileGap = 8, tilePad = 14, bareH = 76;
+const contentTop = (n) => headerH + (kids(n).length && n.desc ? 44 : drillable(n) ? 28 : 0);
+function summaryLines(n, width) {
+  const limit = Math.max(12, Math.floor(width / 6.5)), words = (n.desc || "").split(/\s+/), lines = [];
+  let line = "";
+  for (const word of words) {
+    if (line && (line + " " + word).length > limit) { lines.push(line); line = word; }
+    else line += (line ? " " : "") + word;
+  }
+  if (line) lines.push(line);
+  if (lines.length > 2) return [lines[0], lines[1].slice(0, limit - 1).replace(/\s+\S*$/, "") + "…"];
+  return lines;
+}
+function tileRows(n, maxW) {
+  const gap = display(n) === "choice" ? 32 : tileGap, rows = [];
+  let row = [], x = 0;
+  for (const c of kids(n)) {
+    const w = Math.max(72, c.label.length * 7 + 24);
+    if (row.length && x + gap + w > maxW) { rows.push(row); row = []; x = 0; }
+    const cx = row.length ? x + gap : 0;
+    row.push({ c, x: cx, w });
+    x = cx + w;
+  }
+  if (row.length) rows.push(row);
+  return rows;
+}
+const rowWidth = (row) => (row.length ? row[row.length - 1].x + row[row.length - 1].w : 0);
+function kindLine(n) {
+  const parts = [];
+  if (display(n) === "choice") parts.push("one of");
+  if (n.count) parts.push("×" + (n.count === "many" ? "N" : n.count));
+  return parts.join(" · ");
+}
+// Leaves and off-canvas nodes are drawn as an icon with a caption, without a box.
+const bare = (b) => b.ghost || (!b.frame && !kids(byPath.get(b.p)).length);
+const bareW = (n, extra = "") => Math.max(76, n.label.length * 6.8 + 16, extra.length * 6.2 + 16);
+function size(n, ghost) {
+  const labelW = n.label.length * 7.6 + kindLine(n).length * 6.2 + 64 + (drillable(n) ? 32 : 0);
+  if (ghost) return { w: bareW(n, "in " + byPath.get(parentOf(n.path)).label), h: bareH + 14 };
+  if (!kids(n).length) return { w: bareW(n), h: bareH };
+  if (tagged(n)) {
+    let rows = tileRows(n, 308);
+    const w = Math.max(n.desc ? 260 : 176, labelW, rows.length === 1 ? rowWidth(rows[0]) + tilePad * 2 : 340);
+    rows = tileRows(n, w - tilePad * 2);
+    return { w, h: contentTop(n) + tilePad * 2 + rows.length * (tileH + tileGap) - tileGap };
+  }
+  return { w: Math.max(n.desc ? 248 : 220, labelW), h: contentTop(n) + 14 };
+}
+
+// ---------- layout ----------
+const elk = window.ELK ? new ELK() : null;
+const cache = new Map();
+function edgeText(m) {
+  const l = [...m.labels];
+  if (!l.length) return m.n > 1 ? "×" + m.n : "";
+  return l.length <= 2 ? l.join(" · ") : l[0] + " · +" + (l.length - 1);
+}
+const compactOrder = { "elk.layered.considerModelOrder.strategy": "NODES_AND_EDGES", "elk.layered.crossingMinimization.forceNodeModelOrder": "true" };
+function compactGraph(graph, boxes, drawn) {
+  const g = structuredClone(graph), parents = new Map(), nodes = new Map();
+  (function index(n) {
+    nodes.set(n.id, n);
+    for (const c of n.children || []) { parents.set(c.id, n); index(c); }
+  })(g);
+  const deferred = new Set();
+  drawn.forEach((d, i) => {
+    const parent = parents.get(d.s);
+    if (parent === parents.get(d.t) && boxes.get(parent.id)?.frame) {
+      deferred.add("e" + i);
+      Object.assign(parent.layoutOptions, compactOrder, { "elk.spacing.nodeNode": "96" });
+    }
+  });
+  // Pack single-use clients above and data below a frame, without changing model ownership.
+  const attached = new Map(), moved = new Set();
+  for (const n of g.children) {
+    const b = boxes.get(n.id), model = b && byPath.get(b.p);
+    if (!model || b.ghost || n.children || copies(model) > 1 || !["actor", "client", "db", "store", "queue"].includes(model.kind)) continue;
+    const links = drawn.map((d, i) => ({ d, i })).filter(({ d }) => d.s === n.id || d.t === n.id);
+    if (links.length !== 1) continue;
+    const { d, i } = links[0];
+    let owner = nodes.get(d.s === n.id ? d.t : d.s);
+    while (parents.get(owner.id) !== g) owner = parents.get(owner.id);
+    if (!owner.children) continue;
+    if (!attached.has(owner.id)) attached.set(owner.id, { before: [], after: [] });
+    attached.get(owner.id)[["actor", "client"].includes(model.kind) ? "before" : "after"].push(n);
+    moved.add(n.id); deferred.add("e" + i);
+  }
+  g.children = g.children.filter((n) => !moved.has(n.id)).map((n, i) => attached.has(n.id) ? {
+    id: "__atlas_stack_" + i, children: [...attached.get(n.id).before, n, ...attached.get(n.id).after],
+    layoutOptions: { ...compactOrder, "elk.padding": "[top=0,left=0,bottom=0,right=0]", "elk.spacing.nodeNode": "96" },
+  } : n);
+  g.edges = g.edges.filter((e) => !deferred.has(e.id));
+  Object.assign(g.layoutOptions, {
+    ...compactOrder,
+    "elk.spacing.nodeNode": "56", "elk.layered.spacing.nodeNodeBetweenLayers": "48",
+  });
+  return { graph: g, deferred };
+}
+
+// shortcut: try short orthogonal routes; a full router is only needed to compact maze-like frames.
+function compactRoute(d, boxes, traffic = []) {
+  const a = boxes.get(d.s), b = boxes.get(d.t);
+  const all = [...boxes.values()];
+  const ancestors = (n) => all.filter((f) => f.frame && f.id !== n.id && has(f.p, n.p));
+  const headers = all.filter((n) => n.frame).map((n) => ({ ...n, h: Math.min(n.h, contentTop(byPath.get(n.p)) + 8) }));
+  const obstacles = [...all.filter((n) => !n.frame || !(has(n.p, a.p) && has(n.p, b.p))), ...headers];
+  const intersects = (r, n, pad = 0) => r.x < n.x + n.w + pad && r.x + r.w > n.x - pad && r.y < n.y + n.h + pad && r.y + r.h > n.y - pad;
+  const clear = (p, q, blocks = obstacles) => !blocks.some((n) => intersects({ x: Math.min(p.x, q.x), y: Math.min(p.y, q.y), w: Math.abs(p.x - q.x), h: Math.abs(p.y - q.y) }, n, 12));
+  // External links cross their frame in one straight stub; every bend stays outside.
+  const ports = (n, other) => {
+    const own = ancestors(n), exits = own.filter((f) => !has(f.p, other.p));
+    const blocks = [...all.filter((f) => f.id !== n.id && !own.includes(f) && (!f.frame || !has(f.p, other.p))), ...headers];
+    const options = [
+      [{ x: n.x + n.w / 2, y: n.y }, { x: n.x + n.w / 2, y: Math.min(n.y, ...exits.map((f) => f.y)) - 24 }],
+      [{ x: n.x + n.w / 2, y: n.y + n.h }, { x: n.x + n.w / 2, y: Math.max(n.y + n.h, ...exits.map((f) => f.y + f.h)) + 24 }],
+      [{ x: n.x, y: n.y + n.h / 2 }, { x: Math.min(n.x, ...exits.map((f) => f.x)) - 24, y: n.y + n.h / 2 }],
+      [{ x: n.x + n.w, y: n.y + n.h / 2 }, { x: Math.max(n.x + n.w, ...exits.map((f) => f.x + f.w)) + 24, y: n.y + n.h / 2 }],
+    ].filter(([start, exit]) => [start, exit].every((p) => p.x >= 8 && p.y >= 8) && clear(start, exit, blocks));
+    if (!exits.length) return options;
+    const distance = ([p, q]) => Math.abs(p.x - q.x) + Math.abs(p.y - q.y);
+    const nearest = Math.min(...options.map(distance));
+    return options.filter((port) => distance(port) <= nearest + 1);
+  };
+  const xs = [...new Set(obstacles.flatMap((n) => [n.x - 24, n.x + n.w + 24]))];
+  const ys = [...new Set(obstacles.flatMap((n) => [n.y - 24, n.y + n.h + 24]))];
+  const lateral = (e) => all.some((f) => {
+    if (!f.frame) return false;
+    const a = boxes.get(e.s), b = boxes.get(e.t);
+    if (has(f.p, a.p) === has(f.p, b.p)) return false;
+    const outside = has(f.p, a.p) ? b : a;
+    return outside.y < f.y + f.h && outside.y + outside.h > f.y
+      && (outside.x + outside.w <= f.x || outside.x >= f.x + f.w);
+  });
+  const sideLoad = (n, other, port) => lateral(d) ? 0 : ancestors(n).filter((f) => !has(f.p, other.p)).reduce((load, f) => {
+    const side = port.x === n.x ? -1 : port.x === n.x + n.w ? 1 : 0;
+    if (!side) return load;
+    return load + traffic.filter((e) => {
+      if ((e.s === d.s && e.t === d.t) || (e.s === d.t && e.t === d.s)) return false;
+      const a = boxes.get(e.s), b = boxes.get(e.t);
+      if (has(f.p, a.p) === has(f.p, b.p)) return false;
+      const outside = has(f.p, a.p) ? b : a;
+      return outside.y < f.y + f.h && outside.y + outside.h > f.y
+        && (side < 0 ? outside.x + outside.w <= f.x : outside.x >= f.x + f.w);
+    }).length;
+  }, 0);
+  const crossings = (pts) => {
+    let count = 0;
+    for (const e of traffic) {
+      // Keep lateral trunks stable; the links above and below the frame yield to them.
+      if (lateral(d) && !lateral(e)) continue;
+      if (!e.pts || e.s === d.s || e.s === d.t || e.t === d.s || e.t === d.t) continue;
+      for (let i = 1; i < pts.length; i++) for (let j = 1; j < e.pts.length; j++) {
+        const p = pts[i - 1], q = pts[i], a = e.pts[j - 1], b = e.pts[j];
+        if (p.x === q.x && a.y === b.y && p.x > Math.min(a.x, b.x) && p.x < Math.max(a.x, b.x)
+          && a.y > Math.min(p.y, q.y) && a.y < Math.max(p.y, q.y)) count++;
+        if (p.y === q.y && a.x === b.x && a.x > Math.min(p.x, q.x) && a.x < Math.max(p.x, q.x)
+          && p.y > Math.min(a.y, b.y) && p.y < Math.max(a.y, b.y)) count++;
+      }
+    }
+    return count;
+  };
+  const labelFor = (pts) => {
+    if (!d.text || d.hideLabel) return false;
+    const w = d.text.length * 6.8 + 10, h = 16;
+    const segments = pts.slice(1).map((q, i) => ({ p: pts[i], q, length: Math.abs(q.x - pts[i].x) + Math.abs(q.y - pts[i].y) })).sort((a, b) => b.length - a.length);
+    for (const { p, q, length } of segments) {
+      if (length < (p.y === q.y ? w + 16 : h + 16)) continue;
+      const x = (p.x + q.x) / 2, y = (p.y + q.y) / 2;
+      const lx = x - w / 2, ly = y - h / 2, rect = { x: lx, y: ly, w, h };
+      const crossesFrame = [...boxes.values()].some((n) => n.frame && intersects(rect, n, 8) && !(lx > n.x + 8 && lx + w < n.x + n.w - 8 && ly > n.y + 8 && ly + h < n.y + n.h - 8));
+      if (lx >= 8 && ly >= 8 && !crossesFrame && !obstacles.some((n) => intersects(rect, n, 8))) return { x: lx, y: ly, width: w, height: h, text: d.text };
+    }
+    return null;
+  };
+  let best = null, bestCost = Infinity;
+  for (const [start, exit] of ports(a, b)) for (const [end, entry] of ports(b, a)) {
+    const routes = [
+      [exit, { x: entry.x, y: exit.y }, entry],
+      [exit, { x: exit.x, y: entry.y }, entry],
+      ...xs.map((x) => [exit, { x, y: exit.y }, { x, y: entry.y }, entry]),
+      ...ys.map((y) => [exit, { x: exit.x, y }, { x: entry.x, y }, entry]),
+    ];
+    for (const route of routes) {
+      if (route.some((p) => p.x < 8 || p.y < 8) || !route.slice(1).every((p, i) => clear(route[i], p))) continue;
+      const pts = [start, ...route, end].filter((p, i, all) => !i || p.x !== all[i - 1].x || p.y !== all[i - 1].y);
+      for (let i = pts.length - 2; i > 0; i--) if ((pts[i - 1].x === pts[i].x && pts[i].x === pts[i + 1].x) || (pts[i - 1].y === pts[i].y && pts[i].y === pts[i + 1].y)) pts.splice(i, 1);
+      const congestion = sideLoad(a, b, start) + sideLoad(b, a, end) + crossings(pts);
+      const cost = pts.slice(1).reduce((sum, p, i) => sum + Math.abs(p.x - pts[i].x) + Math.abs(p.y - pts[i].y), pts.length * 24 + congestion * 1000);
+      if (cost >= bestCost) continue;
+      const label = labelFor(pts);
+      if (label === null) continue;
+      best = { ...d, pts, label }; bestCost = cost;
+    }
+  }
+  return best;
+}
+
+function inlineLabel(points, label) {
+  if (!label || !points) return label;
+  const anchor = { x: label.x + label.width / 2, y: label.y + label.height / 2 };
+  let best = null, distance = Infinity;
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1], b = points[i], dx = b.x - a.x, dy = b.y - a.y, length = Math.hypot(dx, dy);
+    if (!length) continue;
+    const margin = Math.min(0.5, ((Math.abs(dx) >= Math.abs(dy) ? label.width : label.height) / 2 + 8) / length);
+    const t = Math.max(margin, Math.min(1 - margin, ((anchor.x - a.x) * dx + (anchor.y - a.y) * dy) / (length * length)));
+    const p = { x: a.x + dx * t, y: a.y + dy * t };
+    const cost = Math.hypot(p.x - anchor.x, p.y - anchor.y) + (margin === 0.5 ? 1000 : 0);
+    if (cost < distance) { best = p; distance = cost; }
+  }
+  return best ? { ...label, x: best.x - label.width / 2, y: best.y - label.height / 2 } : label;
+}
+
+function readLayout(g, boxes, drawn, deferred = new Set()) {
+  const placed = new Map([...boxes].map(([id, b]) => [id, { ...b }]));
+  const origin = new Map([["root", { x: 0, y: 0 }]]);
+  (function collect(n, ox, oy) {
+    for (const c of n.children || []) {
+      const x = ox + c.x, y = oy + c.y;
+      origin.set(c.id, { x, y });
+      if (placed.has(c.id)) Object.assign(placed.get(c.id), { x, y, w: c.width, h: c.height });
+      collect(c, x, y);
+    }
+  })(g, 0, 0);
+  const routed = new Map(g.edges.map((e) => [e.id, e]));
+  const traffic = drawn.map((d, i) => {
+    if (deferred.has("e" + i)) return { ...d, pts: null, label: false };
+    const e = routed.get("e" + i), s = e.sections?.[0], o = origin.get(e.container) || origin.get("root");
+    const shift = (p) => ({ x: p.x + o.x, y: p.y + o.y });
+    const l = e.labels?.[0], labelW = d.text.length * 6.8 + 10;
+    const pts = s ? [s.startPoint, ...(s.bendPoints || []), s.endPoint].map(shift) : null;
+    const label = l && !d.hideLabel && { ...l, ...shift(l), x: l.x + o.x + (l.width - labelW) / 2, width: labelW };
+    return { ...d, pts, label: inlineLabel(pts, label) };
+  });
+  const edges = traffic.map((d, i) => {
+    const a = placed.get(d.s), b = placed.get(d.t);
+    if (deferred.has("e" + i) || [...placed.values()].some((f) => f.frame && (has(f.p, a.p) || has(f.p, b.p)))) return compactRoute(d, placed, traffic);
+    return d;
+  });
+  if (edges.some((e) => !e)) return null;
+  let w = g.width, h = g.height;
+  for (const e of edges) {
+    for (const p of e.pts || []) { w = Math.max(w, p.x + 16); h = Math.max(h, p.y + 16); }
+    if (e.label) { w = Math.max(w, e.label.x + e.label.width + 16); h = Math.max(h, e.label.y + e.label.height + 16); }
+  }
+  return { boxes: placed, edges, w, h };
+}
+// Prefer a balanced landscape footprint, with a smaller area breaking close ties.
+const layoutCost = (L) => Math.max(L.w / 1.4, L.h) + Math.sqrt(L.w * L.h) * 0.15;
+
+function bundleEdges(L) {
+  const groups = new Map(), mid = (b) => ({ x: b.x + b.w / 2, y: b.y + b.h / 2 });
+  for (const d of L.edges) {
+    if (!groups.has(d.m)) groups.set(d.m, []);
+    groups.get(d.m).push(d);
+  }
+  const arc = (a, b) => ({ a, b, c1: { x: (a.x + b.x) / 2, y: a.y }, c2: { x: (a.x + b.x) / 2, y: b.y } });
+  const overlaps = (a, b, pad = 0) => a.x < b.x + b.w + pad && a.x + a.w > b.x - pad && a.y < b.y + b.h + pad && a.y + a.h > b.y - pad;
+  const all = [...L.boxes.values()], connectors = [];
+  for (const [m, edges] of groups) {
+    const S = [...new Set(edges.map((d) => d.s))], T = [...new Set(edges.map((d) => d.t))];
+    const outgoing = S.length === 1 && T.length > 1, incoming = T.length === 1 && S.length > 1;
+    let bundled = false;
+    if (outgoing || incoming) {
+      const sources = S.map((id) => L.boxes.get(id)), targets = T.map((id) => L.boxes.get(id));
+      const participants = [...sources, ...targets], peers = outgoing ? targets : sources;
+      const common = outgoing ? sources[0] : targets[0], commonY = mid(common).y;
+      const sourceBoundary = Math.max(...all.filter((b) => sources.some((s) => b.id === s.id || (b.frame && has(b.p, s.p)))).map((b) => b.x + b.w));
+      const targetBoundary = Math.min(...all.filter((b) => targets.some((t) => b.id === t.id || (b.frame && has(b.p, t.p)))).map((b) => b.x));
+      const labelW = edges[0].text.length * 6.8 + 10, gap = targetBoundary - sourceBoundary;
+      const peerXs = peers.map((b) => outgoing ? b.x : b.x + b.w);
+      const ys = participants.map((b) => mid(b).y);
+      const corridor = { x: sourceBoundary + 16, y: Math.min(...ys) - 8, w: gap - 32, h: Math.max(...ys) - Math.min(...ys) + 16 };
+      const trunkCorridor = { x: Math.max(...sources.map((b) => b.x + b.w)), y: commonY - 8, w: Math.min(...targets.map((b) => b.x)) - Math.max(...sources.map((b) => b.x + b.w)), h: 16 };
+      const peerFrames = peers.some((p) => all.some((b) => b.frame && has(b.p, p.p) && !has(b.p, common.p)));
+      const commonFramed = all.some((b) => b.frame && has(b.p, common.p) && !peers.some((p) => has(b.p, p.p)));
+      const safeExit = !commonFramed || edges.every((e) => {
+        const p = outgoing ? e.pts?.[0] : e.pts?.at(-1), q = outgoing ? e.pts?.[1] : e.pts?.at(-2);
+        return p && q && p.y === commonY && q.y === commonY && p.x === (outgoing ? common.x + common.w : common.x)
+          && (outgoing ? q.x >= sourceBoundary + 12 : q.x <= targetBoundary - 12);
+      });
+      const blocked = peerFrames || !safeExit || all.some((b) => !participants.some((p) => b.id === p.id || (b.frame && has(b.p, p.p))) && (overlaps(corridor, b, 8) || overlaps(trunkCorridor, b, 8)));
+      // Other arrangements keep their individually routed, rounded connectors.
+      if (Math.max(...peerXs) - Math.min(...peerXs) < 2 && gap > Math.max(208, labelW + 144) && !blocked) {
+        const trunkSpan = Math.max(labelW + 48, gap * 0.45);
+        const fork = { x: outgoing ? sourceBoundary + trunkSpan : targetBoundary - trunkSpan, y: commonY };
+        const port = { x: outgoing ? common.x + common.w : common.x, y: commonY };
+        const lead = { x: outgoing ? sourceBoundary + 16 : targetBoundary - 16, y: commonY };
+        const trunk = outgoing ? [arc(port, lead), arc(lead, fork)] : [arc(fork, lead), arc(lead, port)];
+        const branches = peers.map((b) => {
+          const end = { x: outgoing ? b.x : b.x + b.w, y: mid(b).y };
+          return outgoing ? [arc(fork, end)] : [arc(end, fork)];
+        });
+        const labelX = (lead.x + fork.x - labelW) / 2;
+        const rect = { x: labelX, y: commonY - 8, w: labelW, h: 16 };
+        const label = edges[0].text && !all.some((b) => overlaps(rect, b, 8)) ? { x: labelX, y: rect.y, width: labelW, height: 16, text: edges[0].text } : false;
+        if (label || !edges[0].text) {
+          const strokes = [{ arcs: trunk, startArrow: outgoing && m.back, endArrow: incoming && m.fwd }];
+          edges.forEach((d, i) => {
+            d.arcs = outgoing ? [...trunk, ...branches[i]] : [...branches[i], ...trunk];
+            d.bundleLabel = label;
+            strokes.push({ arcs: branches[i], startArrow: incoming && m.back, endArrow: outgoing && m.fwd });
+          });
+          connectors.push({ m, strokes, label }); bundled = true;
+        }
+      }
+    }
+    if (!bundled) for (const d of edges) connectors.push({ m, strokes: [{ pts: d.pts || [mid(L.boxes.get(d.s)), mid(L.boxes.get(d.t))], startArrow: m.back, endArrow: m.fwd }], label: d.label });
+  }
+  return connectors;
+}
+
+async function layout(level) {
+  const key = level.focus + "|" + level.ghosts.join(",");
+  if (cache.has(key)) return cache.get(key);
+  const boxes = new Map(), copyIds = new Map();
+  const leaf = (p, ghost, parent, depth) => {
+    const n = byPath.get(p), ids = [];
+    for (let i = 0; i < (ghost ? 1 : copies(n)); i++) {
+      const id = i ? p + "#" + i : p;
+      boxes.set(id, { id, p, ghost, copy: i, depth, section: !ghost && parent && display(byPath.get(parent)) === "sections", ...size(n, ghost) });
+      ids.push(id);
+    }
+    copyIds.set(p, ids);
+    return ids.map((id) => ({ id, width: boxes.get(id).w, height: boxes.get(id).h }));
+  };
+  const unit = (p, parent, depth) => {
+    if (!expanded(p)) return leaf(p, false, parent, depth);
+    const sec = display(byPath.get(p)) === "sections";
+    boxes.set(p, { id: p, p, frame: true, sections: sec, depth, section: parent && display(byPath.get(parent)) === "sections" });
+    copyIds.set(p, [p]);
+    return [{
+      id: p,
+      layoutOptions: {
+        "elk.padding": `[top=${contentTop(byPath.get(p)) + 24},left=24,bottom=24,right=24]`, "elk.spacing.nodeNode": sec ? "40" : "48",
+        "elk.nodeSize.constraints": "MINIMUM_SIZE", "elk.nodeSize.minimum": `(${size(byPath.get(p), false).w},0)`,
+      },
+      children: kids(byPath.get(p)).flatMap((c) => unit(c.path, p, depth + 1)),
+    }];
+  };
+  const children = [
+    ...kids(byPath.get(level.focus)).flatMap((c) => unit(c.path, null, 0)),
+    ...level.ghosts.flatMap((p) => leaf(p, true, null, 0)),
+  ];
+  // Fan merged edges out to copies; every copy reserves label space so copies line up, but only the first shows it.
+  const drawn = [];
+  for (const m of level.edges) {
+    const S = copyIds.get(m.s), T = copyIds.get(m.t);
+    const pairs = S.length > 1 && T.length > 1 ? S.map((s, i) => [s, T[i % T.length]]) : S.flatMap((s) => T.map((t) => [s, t]));
+    pairs.forEach(([s, t], i) => drawn.push({ m, s, t, text: edgeText(m), hideLabel: i > 0 }));
+  }
+  const repetitions = new Map();
+  for (const d of drawn) repetitions.set(d.m, (repetitions.get(d.m) || 0) + 1);
+  let result;
+  if (elk) {
+    const graph = {
+      id: "root",
+      layoutOptions: {
+        "elk.algorithm": "layered", "elk.direction": "RIGHT", "elk.edgeRouting": "ORTHOGONAL",
+        "elk.hierarchyHandling": "INCLUDE_CHILDREN",
+        "elk.spacing.nodeNode": "48", "elk.layered.spacing.nodeNodeBetweenLayers": "88",
+        "elk.spacing.edgeLabel": "8", "elk.edgeLabels.placement": "CENTER", "elk.padding": "[top=32,left=32,bottom=32,right=32]",
+        "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
+      },
+      children,
+      edges: drawn.map((d, i) => ({
+        id: "e" + i, sources: [d.s], targets: [d.t],
+        // Reserve separate room for the shared label and the curved branches.
+        labels: d.text ? [{ text: d.text, width: d.text.length * 6.8 + 10 + (repetitions.get(d.m) > 1 ? 112 : 0), height: 16 }] : [],
+      })),
+    };
+    result = readLayout(await elk.layout(structuredClone(graph)), boxes, drawn);
+    try {
+      const compact = compactGraph(graph, boxes, drawn);
+      const candidate = readLayout(await elk.layout(compact.graph), boxes, drawn, compact.deferred);
+      if (candidate && (!result || layoutCost(candidate) < layoutCost(result))) result = candidate;
+    } catch (error) { console.warn("Atlas kept the standard layout:", error); }
+  }
+  if (!result) {
+    // Keep every endpoint when safe frame routing is unavailable.
+    for (const b of boxes.values()) if (b.frame) Object.assign(b, { frame: false, ...size(byPath.get(b.p), false) });
+    const cols = Math.ceil(Math.sqrt(boxes.size));
+    const cellW = Math.max(320, ...[...boxes.values()].map((b) => b.w + 32));
+    const cellH = Math.max(150, ...[...boxes.values()].map((b) => b.h + 32));
+    let i = 0;
+    for (const b of boxes.values()) { b.x = 24 + (i % cols) * cellW; b.y = 24 + Math.floor(i / cols) * cellH; i++; }
+    result = { boxes, edges: drawn.map((d) => ({ ...d, pts: null })), w: cols * cellW + 24, h: Math.ceil(boxes.size / cols) * cellH + 24 };
+    $("notice").textContent = elk ? "No clear routes between frames — using grid layout." : "Layout engine unavailable (offline?) — using grid layout.";
+  }
+  result.focus = level.focus;
+  result.connectors = bundleEdges(result);
+  cache.set(key, result);
+  return result;
+}
+
+// ---------- rendering ----------
+const el = (tag, attrs = {}, parent) => {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+};
+const state = { focus: "", sel: null, flow: null, step: 0, playing: null, view: { x: 0, y: 0, k: 1 }, layout: null };
+const viewMemory = new Map();
+let overlayAnim = null;
+
+function applyView(remember = false) {
+  const { x, y, k } = state.view;
+  world.setAttribute("transform", `translate(${x},${y}) scale(${k})`);
+  if (remember && !state.flow && state.layout?.focus === state.focus) viewMemory.set(state.focus, { x, y, k });
+}
+function fitView(L) {
+  const r = svg.getBoundingClientRect();
+  const height = Math.max(100, r.height - (flows.length ? 164 : 0));
+  const k = Math.min(1.3, (r.width - 32) / L.w, (height - 32) / L.h);
+  return { k, x: (r.width - L.w * k) / 2, y: (height - L.h * k) / 2 };
+}
+function scenarioView(L) {
+  const step = state.flow.steps[state.step], a = proxy(step.from, state.focus), b = proxy(step.to, state.focus);
+  const boxes = [...L.boxes.values()].filter((box) => box.p === a || box.p === b), points = [];
+  const rect = (x, y, w, h) => points.push({ x, y }, { x: x + w, y: y + h });
+  for (const box of boxes) rect(box.x, box.y, box.w, box.h);
+  const routes = L.edges.filter((e) => {
+    const s = L.boxes.get(e.s)?.p, t = L.boxes.get(e.t)?.p;
+    return (s === a && t === b) || (s === b && t === a);
+  });
+  if (!routes.length && a !== b) {
+    const from = boxes.find((box) => box.p === a), to = boxes.find((box) => box.p === b);
+    const route = from && to && compactRoute({ s: from.id, t: to.id, text: step.label || "" }, L.boxes, L.edges);
+    if (route) routes.push(route);
+  }
+  for (const route of routes) {
+    const path = [...(route.pts || []), ...(route.arcs || []).flatMap((arc) => [arc.a, arc.b, arc.c1, arc.c2])];
+    points.push(...path);
+    const label = route.bundleLabel || route.label;
+    const w = (step.label || "").length * 6.1 + 18;
+    if (label) {
+      rect(label.x, label.y, label.width, label.height);
+      rect(label.x + label.width / 2 - w / 2, label.y + label.height / 2 - 10, w, 20);
+    } else if (step.label) for (const p of path) rect(p.x - w / 2, p.y - 10, w, 20);
+  }
+  if (!points.length) return fitView(L);
+  const x = Math.min(...points.map((p) => p.x)), y = Math.min(...points.map((p) => p.y));
+  const w = Math.max(...points.map((p) => p.x)) - x, h = Math.max(...points.map((p) => p.y)) - y;
+  const r = svg.getBoundingClientRect(), dock = $("scenario-dock");
+  const bottom = dock.hidden ? r.height : dock.getBoundingClientRect().top - r.top;
+  const width = Math.max(1, r.width - 80), height = Math.max(1, bottom - 24 - 72);
+  const k = Math.min(1.3, width / Math.max(1, w), height / Math.max(1, h));
+  return { k, x: 40 + (width - w * k) / 2 - x * k, y: 72 + (height - h * k) / 2 - y * k };
+}
+// ---------- camera animation ----------
+let viewAnimation = null, renderVersion = 0;
+function cancelViewAnimation() {
+  if (!viewAnimation) return;
+  cancelAnimationFrame(viewAnimation.frame);
+  viewAnimation.finish(false);
+  viewAnimation = null;
+}
+function tween(to, ms, opacity) {
+  cancelViewAnimation();
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    state.view = { ...to };
+    if (opacity != null) world.style.opacity = opacity;
+    applyView();
+    return Promise.resolve(true);
+  }
+  const from = { ...state.view }, o0 = +getComputedStyle(world).opacity;
+  return new Promise((finish) => {
+    const animation = { frame: null, finish };
+    viewAnimation = animation;
+    const t0 = performance.now();
+    const step = (t) => {
+      if (viewAnimation !== animation) return;
+      const p = Math.min(1, (t - t0) / ms), e = 1 - Math.pow(1 - p, 3);
+      for (const k of ["x", "y", "k"]) state.view[k] = from[k] + (to[k] - from[k]) * e;
+      if (opacity != null) world.style.opacity = o0 + (opacity - o0) * e;
+      applyView();
+      if (p < 1) animation.frame = requestAnimationFrame(step);
+      else { viewAnimation = null; finish(true); }
+    };
+    animation.frame = requestAnimationFrame(step);
+  });
+}
+
+async function render(opts = {}) {
+  const version = ++renderVersion;
+  cancelViewAnimation();
+  if (overlayAnim) { cancelAnimationFrame(overlayAnim); overlayAnim = null; }
+  const L = await layout(buildLevel(state.focus, null));
+  if (version !== renderVersion) return;
+  state.layout = L;
+  world.textContent = "";
+  const gFrames = el("g", {}, world), gEdges = el("g", {}, world), gNodes = el("g", {}, world);
+  el("g", { id: "overlay" }, world);
+
+  const all = [...L.boxes.values()];
+  for (const b of all.filter((b) => b.frame).sort((a, z) => a.depth - z.depth)) drawFrame(gFrames, b);
+  for (const { m, strokes, label } of L.connectors) {
+    const g = el("g", { class: "edge" + (m.inferred ? " inferred" : ""), "data-s": m.s, "data-t": m.t }, gEdges);
+    for (const stroke of strokes) {
+      const p = el("path", { d: stroke.arcs ? arcPath(stroke.arcs) : linePath(stroke.pts) }, g);
+      if (stroke.endArrow) p.setAttribute("marker-end", "url(#arr)");
+      if (stroke.startArrow) p.setAttribute("marker-start", "url(#arr)");
+    }
+    if (label) {
+      el("rect", { x: label.x - 3, y: label.y - 2, width: label.width + 6, height: label.height + 4, rx: 4 }, g);
+      text(g, "", label.x + label.width / 2, label.y + label.height / 2, label.text);
+    }
+  }
+  for (const b of all.filter((b) => !b.frame)) drawNode(gNodes, b);
+
+  if (opts.keepView && !state.flow) { world.style.opacity = 1; applyView(true); }
+  else {
+    const target = state.flow ? scenarioView(L) : { ...(viewMemory.get(state.focus) || fitView(L)) };
+    if (!state.flow) viewMemory.set(state.focus, { ...target });
+    if (opts.zoomIn || opts.zoomOut) {
+      const scale = opts.zoomIn ? 0.8 : 1.16, r = svg.getBoundingClientRect();
+      state.view = { k: target.k * scale, x: r.width / 2 - (r.width / 2 - target.x) * scale, y: r.height / 2 - (r.height / 2 - target.y) * scale };
+      world.style.opacity = 0;
+      applyView();
+      tween(target, 260, 1);
+    } else if (state.flow || opts.animate) tween(target, 360, 1);
+    else { state.view = target; world.style.opacity = 1; applyView(); }
+  }
+  crumbs();
+  if (state.flow) showStep();
+}
+
+function center(b) { return { x: b.x + b.w / 2, y: b.y + b.h / 2 }; }
+function text(parent, cls, x, y, s) { const t = el("text", { class: cls, x, y }, parent); t.textContent = s; return t; }
+
+// Straight runs with rounded corners.
+function linePath(points) {
+  const clean = points.filter((p, i) => !i || p.x !== points[i - 1].x || p.y !== points[i - 1].y);
+  let path = `M${clean[0].x} ${clean[0].y}`;
+  for (let i = 1; i < clean.length; i++) {
+    const p = clean[i], next = clean[i + 1], prev = clean[i - 1];
+    if (!next || (p.x - prev.x) * (next.y - p.y) === (p.y - prev.y) * (next.x - p.x)) { path += ` L${p.x} ${p.y}`; continue; }
+    const before = Math.hypot(p.x - prev.x, p.y - prev.y), after = Math.hypot(next.x - p.x, next.y - p.y);
+    const r = Math.min(12, before / 2, after / 2);
+    path += ` L${p.x + (prev.x - p.x) * r / before} ${p.y + (prev.y - p.y) * r / before} Q${p.x} ${p.y} ${p.x + (next.x - p.x) * r / after} ${p.y + (next.y - p.y) * r / after}`;
+  }
+  return path;
+}
+function reverseArcs(arcs) { return [...arcs].reverse().map((c) => ({ a: c.b, b: c.a, c1: c.c2, c2: c.c1 })); }
+function arcPath(arcs) {
+  return `M${arcs[0].a.x} ${arcs[0].a.y} ` + arcs.map((c) => `C${c.c1.x} ${c.c1.y} ${c.c2.x} ${c.c2.y} ${c.b.x} ${c.b.y}`).join(" ");
+}
+function boxPath(w, h, r) {
+  return `M${r} 0H${w - r}Q${w} 0 ${w} ${r}V${h - r}Q${w} ${h} ${w - r} ${h}H${r}Q0 ${h} 0 ${h - r}V${r}Q0 0 ${r} 0Z`;
+}
+
+// Lucide icons (ISC), one per kind.
+const ICONS = {
+  client: '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 8h20M6 4v4M10 4v4"/>',
+  actor: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+  service: '<rect x="2" y="3" width="20" height="8" rx="2"/><rect x="2" y="13" width="20" height="8" rx="2"/><path d="M6 7h.01M6 17h.01"/>',
+  process: '<rect x="5" y="5" width="14" height="14" rx="2"/><rect x="9" y="9" width="6" height="6" rx="1"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/>',
+  package: '<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/>',
+  module: '<path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5a2 2 0 0 0 2 2h1M16 21h1a2 2 0 0 0 2-2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1"/>',
+  class: '<path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/>',
+  function: '<path d="M10 20s1 0 2-4l2-8c1-4 3-4 3-4M8 11h8"/>',
+  db: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5M3 12a9 3 0 0 0 18 0"/>',
+  store: '<rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8M10 12h4"/>',
+  queue: '<path d="M3 6h18M3 12h18M3 18h18"/>',
+  external: '<circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20"/>',
+  group: '<path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9l-.8-1.2A2 2 0 0 0 7.9 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"/>',
+};
+function icon(parent, kind, x, y, size) {
+  const g = el("g", { class: "icon", transform: `translate(${x},${y}) scale(${size / 24})` }, parent);
+  g.innerHTML = ICONS[kind] || ICONS.module;
+  return g;
+}
+
+function shell(parent, b, extra) {
+  const n = byPath.get(b.p);
+  const cls = ["node", "kind-" + n.kind, ...extra, b.section ? "section" : "", n.inferred ? "inferred" : "", state.sel === b.p ? "sel" : ""];
+  const g = el("g", { class: cls.filter(Boolean).join(" "), transform: `translate(${b.x},${b.y})`, "data-p": b.p }, parent);
+  el("title", {}, g).textContent = n.desc || n.label;
+  if (bare(b)) {
+    el("rect", { width: b.w, height: b.h, fill: "transparent" }, g);
+    el("rect", { class: "halo", x: b.w / 2 - 24, y: 0, width: 48, height: 48, rx: 14 }, g);
+    icon(g, n.kind, b.w / 2 - 13, 11, 26);
+    text(g, "l bare-l", b.w / 2, 66, n.label).setAttribute("text-anchor", "middle");
+    if (b.ghost) text(g, "k", b.w / 2, 82, "in " + byPath.get(parentOf(b.p)).label).setAttribute("text-anchor", "middle");
+    return { g, n };
+  }
+  el("path", { class: "outline", d: boxPath(b.w, b.h, b.section ? 10 : b.frame ? 16 : 12) }, g);
+  const open = drillable(n) && !b.ghost;
+  const heading = open ? el("g", { class: "container-heading", role: "button", tabindex: "0", "aria-label": "Open " + n.label }, g) : g;
+  if (open) el("rect", { class: "heading-hit", x: 4, y: 4, width: b.w - 8, height: contentTop(n) - 4, rx: 4, fill: "transparent" }, heading);
+  icon(heading, n.kind, tilePad, 11, 15);
+  text(heading, "l", tilePad + 22, 23, n.label);
+  text(heading, "k", tilePad + 30 + n.label.length * 7.4, 23, kindLine(n));
+  if (!b.ghost && kids(n).length && n.desc) {
+    summaryLines(n, b.w - tilePad * 2).forEach((line, i) => text(heading, "p", tilePad, 47 + i * 17, line));
+  }
+  if (open) {
+    const btn = el("g", { class: "open-btn", transform: `translate(${b.w - 36},8)` }, heading);
+    el("circle", { cx: 12, cy: 12, r: 12 }, btn);
+    el("path", { d: "M9.5 14.5l5-5M10.5 9.5h4v4" }, btn);
+    heading.addEventListener("click", (ev) => { if (dragMoved) return; ev.stopPropagation(); drill(b); });
+    heading.addEventListener("keydown", (ev) => {
+      if (ev.key !== "Enter" && ev.key !== " ") return;
+      ev.preventDefault(); ev.stopPropagation(); drill(b);
+    });
+  }
+  return { g, n };
+}
+
+function drawFrame(parent, b) {
+  const { g } = shell(parent, b, ["frame"]);
+  g.addEventListener("click", (ev) => { if (dragMoved) return; ev.stopPropagation(); select(b.p); });
+}
+
+function drawNode(parent, b) {
+  const n = byPath.get(b.p), open = drillable(n) && !tagged(n) && !b.ghost;
+  const { g } = shell(parent, b, [open ? "open" : "", b.ghost ? "ghost" : ""]);
+  if (!b.ghost && tagged(n)) drawTiles(g, n, b);
+  g.addEventListener("click", (ev) => {
+    if (dragMoved) return;
+    ev.stopPropagation();
+    if (b.ghost) return go(parentOf(b.p), b.p);
+    if (open) return drill(b);
+    select(b.p);
+  });
+}
+
+function drawTiles(g, n, b) {
+  tileRows(n, b.w - tilePad * 2).forEach((row, r) => {
+    const y = contentTop(n) + tilePad + r * (tileH + tileGap);
+    row.forEach(({ c, x, w }, i) => {
+      if (i && display(n) === "choice") text(g, "or", tilePad + x - 17, y + tileH / 2 + 3, "or");
+      const tile = el("g", { class: "tile" }, g);
+      el("path", { class: "outline", d: boxPath(w, tileH, 8), transform: `translate(${tilePad + x},${y})` }, tile);
+      text(tile, "", tilePad + x + w / 2, y + tileH / 2 + 4, c.label).setAttribute("text-anchor", "middle");
+      el("title", {}, tile).textContent = c.desc || c.label;
+    });
+  });
+}
+
+function select(p) {
+  state.sel = p;
+  for (const g of world.querySelectorAll(".node")) g.classList.toggle("sel", g.dataset.p === p);
+}
+
+async function drill(b) {
+  applyView(true);
+  const r = svg.getBoundingClientRect(), k = Math.min(r.width / b.w, r.height / b.h) * 0.9;
+  const c = center(b);
+  if (await tween({ k, x: r.width / 2 - c.x * k, y: r.height / 2 - c.y * k }, 260, 0)) go(b.p, null, true);
+}
+
+let pendingZoom = false;
+function go(focus, sel = null, zoomIn = false) {
+  state.sel = sel;
+  pendingZoom = zoomIn;
+  const hash = "#" + encodeURIComponent(focus);
+  if (location.hash === hash || (!focus && !location.hash)) { pendingZoom = false; render({ zoomIn }); }
+  else location.hash = hash;
+}
+window.addEventListener("hashchange", () => {
+  state.focus = readHash();
+  render({ zoomIn: pendingZoom, zoomOut: !pendingZoom && !!state.layout });
+  pendingZoom = false;
+});
+function readHash() {
+  const p = decodeURIComponent(location.hash.slice(1));
+  return byPath.has(p) ? p : "";
+}
+
+function crumbs() {
+  const nav = $("crumbs"), chain = [];
+  for (let p = state.focus; ; p = parentOf(p)) { chain.unshift(p); if (!p) break; }
+  nav.textContent = "";
+  chain.forEach((p, i) => {
+    if (i) nav.append(h("span", { className: "sep", textContent: "/" }));
+    nav.append(p === state.focus ? h("span", { className: "here", textContent: byPath.get(p).label }) : h("button", { textContent: byPath.get(p).label, onclick: () => go(p) }));
+  });
+  document.title = (state.focus ? byPath.get(state.focus).label + " · " : "") + MODEL.title + " · Atlas";
+}
+
+function h(tag, props = {}, ...children) {
+  const e = document.createElement(tag);
+  Object.assign(e, props);
+  for (const c of children) if (c != null) e.append(c);
+  return e;
+}
+// ---------- flows ----------
+function renderScenarioDock() {
+  const dock = $("scenario-dock"), track = $("scenario-track"), f = state.flow;
+  dock.hidden = !flows.some((flow) => flow.steps.length);
+  track.textContent = "";
+  track.className = f ? "step-list" : "scenario-list";
+  track.setAttribute("aria-label", f ? f.label + " steps" : "Scenarios");
+  if (f) {
+    const back = () => {
+      const card = h("button", { className: "scenario-card back-card", onclick: () => setFlow(null) },
+        h("span", { className: "eyebrow", textContent: "← Back" }),
+        h("strong", { textContent: "All scenarios" }),
+        h("span", { className: "detail", textContent: f.label }),
+      );
+      card.setAttribute("aria-label", "Back to scenarios");
+      return card;
+    };
+    track.append(back());
+    f.steps.forEach((s, i) => {
+      const route = byPath.get(s.from).label + " → " + byPath.get(s.to).label;
+      const card = h("button", { className: "scenario-card step-card", onclick: () => setStep(i) },
+        h("span", { className: "eyebrow", textContent: "Step " + (i + 1) }),
+        h("strong", { textContent: s.label || route }),
+        h("span", { className: "detail", textContent: route }),
+      );
+      card.setAttribute("aria-label", `Step ${i + 1}: ${s.label || route}. ${route}`);
+      track.append(card);
+    });
+    track.append(back());
+    updateScenarioCards();
+  } else {
+    flows.filter((flow) => flow.steps.length).forEach((flow, i) => track.append(
+      h("button", { className: "scenario-card", onclick: () => setFlow(flow.id) },
+        h("span", { className: "eyebrow", textContent: "Scenario " + String(i + 1).padStart(2, "0") }),
+        h("strong", { textContent: flow.label }),
+        h("span", { className: "detail", textContent: flow.steps.length + " steps · Explore →" }),
+      ),
+    ));
+    track.scrollLeft = 0;
+  }
+}
+function updateScenarioCards() {
+  const f = state.flow;
+  if (!f) return;
+  const track = $("scenario-track"), cards = [...track.children].slice(1, -1);
+  cards.forEach((card, i) => {
+    card.classList.toggle("active", i === state.step);
+    if (i === state.step) card.setAttribute("aria-current", "step");
+    else card.removeAttribute("aria-current");
+  });
+  requestAnimationFrame(() => {
+    const active = cards[state.step];
+    if (!active?.isConnected) return;
+    track.scrollTo({ left: active.offsetLeft + active.offsetWidth / 2 - track.clientWidth / 2,
+      behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
+  });
+}
+let scenarioOrigin = "";
+// The shallowest canvas that shows both ends of a step as different nodes.
+function stepFocus(s) {
+  const ok = (f) => has(f, s.from) && has(f, s.to) && (() => { const a = proxy(s.from, f), b = proxy(s.to, f); return a && b && a !== b; })();
+  if (ok(state.focus)) return state.focus;
+  const x = s.from.split("."), y = s.to.split("."), common = [];
+  for (let i = 0; i < Math.min(x.length, y.length) && x[i] === y[i]; i++) common.push(x[i]);
+  for (let i = 0; i <= common.length; i++) if (ok(common.slice(0, i).join("."))) return common.slice(0, i).join(".");
+  return parentOf(s.from);
+}
+function setFlow(id) {
+  stopPlay();
+  if (!state.flow) { scenarioOrigin = state.focus; applyView(true); }
+  state.flow = flows.find((f) => f.id === id && f.steps.length) || null;
+  state.step = 0;
+  renderScenarioDock();
+  cache.clear();
+  if (!state.flow && state.focus !== scenarioOrigin) return go(scenarioOrigin);
+  if (state.flow) {
+    const target = stepFocus(state.flow.steps[0]);
+    if (target !== state.focus) return go(target);
+  }
+  render({ keepView: !!state.flow, animate: !state.flow });
+}
+function setStep(i) {
+  const f = state.flow;
+  if (!f) return;
+  state.step = Math.max(0, Math.min(f.steps.length - 1, i));
+  updateScenarioCards();
+  const target = stepFocus(f.steps[state.step]);
+  if (target !== state.focus) return go(target);
+  if (state.layout?.focus !== state.focus) return;
+  showStep();
+  tween(scenarioView(state.layout), 360, 1);
+}
+function showStep() {
+  const f = state.flow, s = f.steps[state.step], L = state.layout;
+  const a = proxy(s.from, state.focus), b = proxy(s.to, state.focus);
+  const overlay = $("overlay");
+  overlay.textContent = "";
+  if (overlayAnim) cancelAnimationFrame(overlayAnim);
+  const ba = a && L.boxes.get(a), bb = b && L.boxes.get(b);
+  for (const g of world.querySelectorAll(".node")) {
+    const p = g.dataset.p, frame = g.classList.contains("frame");
+    const on = p === a || p === b || (frame && ((a && has(p, a)) || (b && has(p, b))));
+    g.classList.toggle("dim", !on);
+    g.classList.toggle("pulse", !frame && on && a === b);
+  }
+  for (const g of world.querySelectorAll(".edge")) g.classList.add("dim");
+  if (!ba || !bb || a === b) return;
+  const route = L.edges.find((e) => (e.s === ba.id && e.t === bb.id) || (e.s === bb.id && e.t === ba.id))
+    || compactRoute({ s: ba.id, t: bb.id, text: s.label || "" }, L.boxes, L.edges);
+  if (!route) return;
+  const p0 = edgePoint(ba, center(bb)), p1 = edgePoint(bb, center(ba));
+  const mx = (p0.x + p1.x) / 2, my = (p0.y + p1.y) / 2, dx = p1.x - p0.x, dy = p1.y - p0.y;
+  const c = { x: mx - dy * 0.18, y: my + dx * 0.18 };
+  const pts = route?.pts && (route.s === ba.id ? route.pts : [...route.pts].reverse());
+  const arcs = route?.arcs && (route.s === ba.id ? route.arcs : reverseArcs(route.arcs));
+  const g = el("g", { class: "flow" }, overlay);
+  const path = el("path", { d: arcs ? arcPath(arcs) : pts ? linePath(pts) : `M${p0.x} ${p0.y} Q${c.x} ${c.y} ${p1.x} ${p1.y}`, "marker-end": "url(#farr)" }, g);
+  const len = path.getTotalLength();
+  const dot = el("circle", { r: 3.5 }, g);
+  if (s.label) {
+    const routeLabel = route?.bundleLabel || route?.label;
+    const labelPoint = routeLabel ? { x: routeLabel.x + routeLabel.width / 2, y: routeLabel.y + routeLabel.height / 2 } : path.getPointAtLength(len / 2);
+    const { x: lx, y: ly } = labelPoint, w = s.label.length * 6.1 + 18;
+    el("rect", { x: lx - w / 2, y: ly - 10, width: w, height: 20, rx: 10 }, g);
+    text(g, "", lx, ly + 3.5, s.label).setAttribute("text-anchor", "middle");
+  }
+  const t0 = performance.now();
+  const tick = (t) => {
+    const pt = path.getPointAtLength((((t - t0) % 1400) / 1400) * len);
+    dot.setAttribute("cx", pt.x); dot.setAttribute("cy", pt.y);
+    overlayAnim = requestAnimationFrame(tick);
+  };
+  overlayAnim = requestAnimationFrame(tick);
+}
+function edgePoint(b, toward) {
+  const c = center(b), dx = toward.x - c.x, dy = toward.y - c.y;
+  const s = Math.min(Math.abs((b.w / 2 + 4) / (dx || 1e-9)), Math.abs((b.h / 2 + 4) / (dy || 1e-9)));
+  return { x: c.x + dx * s, y: c.y + dy * s };
+}
+function stopPlay() { clearInterval(state.playing); state.playing = null; }
+function togglePlay() {
+  if (!state.flow) return;
+  if (state.playing) return stopPlay();
+  if (state.step >= state.flow.steps.length - 1) setStep(0);
+  state.playing = setInterval(() => (state.step >= state.flow.steps.length - 1 ? stopPlay() : setStep(state.step + 1)), 1800);
+}
+
+// ---------- input ----------
+let drag = null, dragMoved = false;
+svg.addEventListener("pointerdown", (e) => { cancelViewAnimation(); world.style.opacity = 1; applyView(true); drag = { x: e.clientX, y: e.clientY, v: { ...state.view } }; dragMoved = false; });
+svg.addEventListener("pointermove", (e) => {
+  if (!drag) return;
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  if (!dragMoved && Math.hypot(dx, dy) < 4) return;
+  if (!dragMoved) { dragMoved = true; svg.setPointerCapture(e.pointerId); svg.classList.add("dragging"); }
+  state.view.x = drag.v.x + dx; state.view.y = drag.v.y + dy; applyView(true);
+});
+svg.addEventListener("pointerup", () => { drag = null; svg.classList.remove("dragging"); setTimeout(() => (dragMoved = false)); });
+svg.addEventListener("click", () => { if (!dragMoved && state.sel) select(null); });
+svg.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  cancelViewAnimation(); world.style.opacity = 1;
+  const r = svg.getBoundingClientRect(), v = state.view;
+  const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? r.height : 1;
+  // Trackpad pinches arrive as Ctrl+wheel; ordinary scrolling pans in screen pixels.
+  if (e.ctrlKey || e.metaKey) zoomAt(v.k * Math.exp(-e.deltaY * unit * 0.01), e.clientX, e.clientY);
+  else { v.x -= e.deltaX * unit; v.y -= e.deltaY * unit; }
+  applyView(true);
+}, { passive: false });
+function zoomAt(scale, clientX, clientY) {
+  const r = svg.getBoundingClientRect(), mx = clientX - r.left, my = clientY - r.top, v = state.view;
+  const k = Math.max(0.15, Math.min(4, scale));
+  state.view = { k, x: mx - (mx - v.x) * (k / v.k), y: my - (my - v.y) * (k / v.k) };
+}
+// Safari exposes trackpad pinch through gesture events instead of Ctrl+wheel.
+let gestureScale = null;
+svg.addEventListener("gesturestart", (e) => { e.preventDefault(); cancelViewAnimation(); world.style.opacity = 1; gestureScale = state.view.k; }, { passive: false });
+svg.addEventListener("gesturechange", (e) => {
+  e.preventDefault();
+  if (gestureScale == null) return;
+  zoomAt(gestureScale * e.scale, e.clientX, e.clientY);
+  applyView(true);
+}, { passive: false });
+svg.addEventListener("gestureend", (e) => { e.preventDefault(); gestureScale = null; }, { passive: false });
+window.addEventListener("keydown", (e) => {
+  if (["INPUT", "BUTTON"].includes(e.target.tagName) && e.key === " ") return;
+  if (e.key === "Escape") {
+    if (state.flow) { e.preventDefault(); setFlow(null); return; }
+    state.sel ? select(null) : state.focus && go(parentOf(state.focus), state.focus);
+  }
+  if (!state.flow) return;
+  if (e.key === "ArrowRight") { e.preventDefault(); setStep(state.step + 1); }
+  if (e.key === "ArrowLeft") { e.preventDefault(); setStep(state.step - 1); }
+  if (e.key === " ") { e.preventDefault(); togglePlay(); }
+});
+window.addEventListener("resize", () => { if (state.layout) render(); if (state.flow) updateScenarioCards(); });
+
+try { const t = localStorage.getItem("atlas-theme"); if (t) document.documentElement.dataset.theme = t; } catch {}
+function zoomBy(factor) {
+  const r = svg.getBoundingClientRect();
+  cancelViewAnimation(); world.style.opacity = 1;
+  zoomAt(state.view.k * factor, r.left + r.width / 2, r.top + r.height / 2);
+  applyView(true);
+}
+$("zoom-in").onclick = () => zoomBy(1.25);
+$("zoom-out").onclick = () => zoomBy(0.8);
+$("zoom-fit").onclick = () => state.layout && tween(state.flow ? scenarioView(state.layout) : fitView(state.layout), 260, 1);
+$("theme").onclick = () => {
+  const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+  const cur = document.documentElement.dataset.theme || (dark ? "dark" : "light");
+  document.documentElement.dataset.theme = cur === "dark" ? "light" : "dark";
+  try { localStorage.setItem("atlas-theme", document.documentElement.dataset.theme); } catch {}
+};
+
+state.focus = readHash();
+renderScenarioDock();
+render();
+</script>
+</body>
+</html>

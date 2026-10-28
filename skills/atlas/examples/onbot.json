@@ -1,0 +1,111 @@
+{
+  "title": "OnBot",
+  "desc": "Example atlas built from the OnBot concept sketch and docs/plan/01-architecture.md; no code was read.",
+  "nodes": [
+    {
+      "id": "ui", "label": "UI", "kind": "client", "display": "chips",
+      "desc": "User input and rendering; never owns run state.",
+      "children": [
+        { "id": "web", "label": "Web", "kind": "client", "desc": "TanStack Start web client." },
+        { "id": "desktop", "label": "Desktop", "kind": "client", "desc": "Desktop client and environment companion." }
+      ]
+    },
+    {
+      "id": "relay", "label": "Relay", "kind": "service", "display": "sections",
+      "desc": "Owns shared records, routing, grants, run admission, configuration and supervision.",
+      "children": [
+        {
+          "id": "api", "label": "API", "kind": "module", "display": "chips",
+          "desc": "Commands, queries and events for clients.",
+          "children": [
+            { "id": "commands", "label": "Commands", "kind": "function" },
+            { "id": "queries", "label": "Queries", "kind": "function" },
+            { "id": "events", "label": "Events", "kind": "function" }
+          ]
+        },
+        {
+          "id": "runtime", "label": "Runtime", "kind": "module", "display": "chips",
+          "desc": "Durable scheduling and bot process supervision.",
+          "children": [
+            { "id": "scheduler", "label": "Scheduler", "kind": "module", "desc": "Admits and assigns persisted runs." },
+            { "id": "supervisor", "label": "Supervisor", "kind": "module", "desc": "Starts, stops and restarts bot processes." }
+          ]
+        }
+      ]
+    },
+    { "id": "db", "label": "DB", "kind": "db", "desc": "Application database; supports multiple providers." },
+    {
+      "id": "bot", "label": "Bot", "kind": "process", "count": "many",
+      "desc": "Each bot is an independent OS process.",
+      "children": [
+        { "id": "runtime", "label": "Bot runtime", "kind": "module", "desc": "Runs the bot: picks the engine, loads extensions, executes tools." },
+        {
+          "id": "state", "label": "Bot state", "kind": "store", "display": "chips",
+          "desc": "Everything the bot keeps between runs.",
+          "children": [
+            { "id": "conversations", "label": "Conversations", "kind": "store" },
+            { "id": "memory", "label": "Memory", "kind": "store" },
+            { "id": "teams", "label": "Teams", "kind": "store" },
+            { "id": "crons", "label": "Crons", "kind": "store" },
+            { "id": "triggers", "label": "Triggers", "kind": "store" }
+          ]
+        },
+        {
+          "id": "engine", "label": "Engine", "kind": "module", "display": "choice",
+          "desc": "Agent engine behind an OnBot service boundary.",
+          "children": [
+            { "id": "pi", "label": "Pi", "kind": "module" },
+            { "id": "codex", "label": "Codex", "kind": "module" },
+            { "id": "acp", "label": "ACP", "kind": "module", "desc": "Any Agent Client Protocol engine." }
+          ]
+        },
+        {
+          "id": "env", "label": "Environment", "kind": "module", "display": "choice",
+          "desc": "Where tools touch real resources.",
+          "children": [
+            { "id": "local", "label": "Local", "kind": "module" },
+            { "id": "vms", "label": "Sandboxed VMs", "kind": "external" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "registry", "label": "Shared registry", "kind": "store", "display": "chips",
+      "desc": "Validated immutable extension artifacts shared by all bots.",
+      "children": [
+        { "id": "plugins", "label": "Plugins", "kind": "module" },
+        { "id": "skills", "label": "Skills", "kind": "module" },
+        { "id": "mcp", "label": "MCP", "kind": "module" }
+      ]
+    }
+  ],
+  "edges": [
+    { "from": "ui", "to": "relay.api", "label": "commands · events", "dir": "both" },
+    { "from": "relay.api", "to": "relay.runtime", "label": "runs", "dir": "both" },
+    { "from": "relay.api", "to": "db", "label": "records", "dir": "both" },
+    { "from": "relay.runtime", "to": "bot.runtime", "label": "worker protocol", "dir": "both" },
+    { "from": "bot.runtime", "to": "registry", "label": "load extensions" },
+    { "from": "bot.state", "to": "bot.runtime", "label": "context" },
+    { "from": "bot.runtime", "to": "bot.engine", "label": "drives" },
+    { "from": "bot.runtime", "to": "bot.env", "label": "execute" }
+  ],
+  "flows": [
+    {
+      "id": "post-message",
+      "label": "User message → AI reply",
+      "steps": [
+        { "from": "ui.web", "to": "relay.api.commands", "label": "post message" },
+        { "from": "relay.api", "to": "db", "label": "commit message + run" },
+        { "from": "relay.api", "to": "relay.runtime.scheduler", "label": "admit run" },
+        { "from": "relay.runtime", "to": "bot.runtime", "label": "assign run" },
+        { "from": "bot.state.conversations", "to": "bot.runtime", "label": "load conversation" },
+        { "from": "bot.runtime", "to": "registry", "label": "resolve tools" },
+        { "from": "bot.runtime", "to": "bot.engine", "label": "submit run + tools" },
+        { "from": "bot.runtime", "to": "bot.env", "label": "run tool" },
+        { "from": "bot.runtime", "to": "relay.runtime", "label": "publish reply" },
+        { "from": "relay.api", "to": "db", "label": "commit reply" },
+        { "from": "relay.api.events", "to": "ui.web", "label": "publication event" }
+      ]
+    }
+  ]
+}
