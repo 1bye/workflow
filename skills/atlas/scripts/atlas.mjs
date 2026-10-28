@@ -6,6 +6,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const KINDS = new Set(["actor", "client", "service", "process", "package", "module", "class", "function", "db", "store", "queue", "external", "group"]);
+const DISPLAYS = new Set(["box", "frame", "sections", "chips", "choice"]);
 const ID = /^[a-z0-9][a-z0-9-]*$/;
 
 const args = process.argv.slice(2);
@@ -64,11 +65,24 @@ function walk(nodes, parent) {
     if (!KINDS.has(n.kind)) errors.push(`${where}: kind must be one of ${[...KINDS].join(", ")}`);
     if (n.src) checkSrc(where, n.src);
 
+    const display = n.display ?? "box";
+    const children = n.children ?? [];
+
+    if (!DISPLAYS.has(display)) errors.push(`${where}: display must be one of ${[...DISPLAYS].join(", ")}`);
+    if (display !== "box" && !children.length) errors.push(`${where}: display "${display}" needs children`);
+    if (n.count != null && n.count !== "many" && !(Number.isInteger(n.count) && n.count >= 2))
+      errors.push(`${where}: count must be an integer >= 2 or "many"`);
+    if (n.count != null && (display === "frame" || display === "sections"))
+      errors.push(`${where}: count cannot be combined with display "${display}"`);
+    if ((display === "chips" || display === "choice") && children.some((c) => c.children?.length))
+      warnings.push(`${where}: ${display} children should be leaves; their insides are hidden`);
+
     if (n.children) {
       walk(n.children, path);
-      const count = n.children.length;
-      if (count > 0 && count < 3) warnings.push(`${where}: only ${count} children; consider inlining them`);
-      if (count > 9) warnings.push(`${where}: ${count} children; consider grouping`);
+      const count = children.length;
+      if (display === "box" && count > 0 && count < 3) warnings.push(`${where}: only ${count} children; consider chips or inlining`);
+      if ((display === "frame" || display === "sections") && count > 6) warnings.push(`${where}: ${count} children is a lot for an open ${display}`);
+      if (display !== "chips" && display !== "choice" && count > 9) warnings.push(`${where}: ${count} children; consider grouping`);
     }
   }
 }
