@@ -4,6 +4,10 @@ A flow is one user task from intent to done, such as "add a marker" or
 "rename a file". Score each flow as it is today, and score a proposed version
 next to it wherever you find friction.
 
+Use counts and KLM where visible actions support a meaningful comparison.
+For screenshot-only readouts, describe scanning tasks briefly; do not assign
+reading or comprehension times with KLM or invent unseen click paths.
+
 ## Steps
 
 Write the steps as the user experiences them: what they look at, decide,

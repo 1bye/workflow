@@ -1,9 +1,10 @@
 # Teardown template
 
-Copy this structure into `.teardown/<name>/README.md`. Keep the section order;
-drop a section only when it truly does not apply (and say so in one line).
-Part files use the same structure from **Anatomy** down, plus their own Flows
-if they have any.
+Use this structure for `.teardown/<name>/README.md`. For reconstruction,
+bring Anatomy, Tokens, and the Rebuild contract forward. Compress sections
+unsupported by the evidence into a short limitations note rather than filling
+tables with unknowns. Part files use the same structure from **Anatomy** down,
+plus their own Flows if they have any.
 
 ````markdown
 # <Name> — Teardown
@@ -11,6 +12,10 @@ if they have any.
 | Source | Evidence | Date |
 | --- | --- | --- |
 | `src/components/Map/` · video `demo.mp4` | mostly measured | 2026-10-28 |
+
+State the target boundary and goal. For a screenshot handoff, declare the
+coordinate space and chosen image-to-CSS scale. Separate unknown original
+values from the working assumptions used to proceed.
 
 ## 1. Essence
 
@@ -30,7 +35,8 @@ The rules that make it feel this way. Keep these when rebuilding.
 
 ## 3. Flows
 
-One block per user task. Score with references/flows.md.
+One block per actionable user task. Score with references/flows.md. For a
+static readout, briefly describe the scanning task; omit speculative timing.
 
 ### F1. Add a marker
 
@@ -83,6 +89,19 @@ sizing), spacing and color tokens used, and children.
 | --- | --- | --- | --- | --- |
 | ZoomControls | Zoom in/out | column, gap `space.stack.xs`, fixed bottom-right `space.inset.md` | `color.surface.raised`, `radius.md` | measured `ZoomControls.tsx:12` |
 
+For reconstruction, make the important visual relationships explicit:
+
+- Bind text roles to specific elements or spans: color, relative emphasis,
+  and typography (family/fallback, size, weight, line height as useful).
+- Describe key anchors, insets, column sizing, and row alignment. Distinguish
+  baseline pitch from empty gap; check that band sizes and insets reconcile
+  with the overall bounds. Prefer a few clear constraints over every pixel.
+- For charts, define the width denominator and treatment of gaps; segment
+  widths plus gaps must fit the stated track.
+- Identify distinctive marks and assets. If exact assets are unavailable,
+  describe their visible silhouette and a suitable approximation. Unknown
+  asset provenance does not make visible shape unknowable.
+
 ## 6. States
 
 ✓ observed · ~ inferred · — absent · ? unknown
@@ -106,6 +125,7 @@ Summary by role; the full set lives in `tokens.json` (see references/tokens.md).
 
 Scale summary: spacing base (e.g. 4px grid, steps 4/8/12/16/24), radius
 steps, type scale, elevation levels. List values that break the scale.
+Label inferred implementation choices where the original value is unknown.
 
 ## 8. Motion
 
@@ -128,11 +148,20 @@ whether reduced motion is respected.
 ## 10. Rebuild contract
 
 A checklist an agent must satisfy for a faithful rebuild (or for the proposed
-version, if the user asks for it). Every line is verifiable.
+version, if the user asks for it). Every line is verifiable. Match precision
+to the evidence: use approximate bounds or relationships where exact values
+are unavailable, and identify acceptable fallbacks for important unknowns.
 
 - [ ] Clicking empty map space creates a marker without a tool switch (P1).
 - [ ] The label field is focused when the popover opens; Enter commits, Esc
       cancels and removes an empty marker (P3).
-- [ ] All colors, spacing, radii, and durations come from `tokens.json`.
+- [ ] Recovered values use semantic tokens; important fallbacks are identified
+      as implementation choices.
 - [ ] Every state marked ✓ in States exists with the listed changes.
+
+For reconstruction, include checks for the important geometry, text-role
+assignments, typography, and asset shapes described in Anatomy. When a render
+is produced, record which checks passed and what remains approximate. For a
+requested blind trial, evaluate the builder's output against the reference
+separately and record whether the result is an initial or refined pass.
 ````

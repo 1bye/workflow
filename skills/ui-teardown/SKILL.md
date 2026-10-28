@@ -9,13 +9,20 @@ Turn a UI into a teardown: one Markdown document (plus part files and a token
 file for composite UIs) that explains how the UI works, why it feels the way
 it does, and exactly what it is made of. Two readers use it:
 
-- **The user** reads the top half (Essence, Principles, Flows, Opportunities)
-  to judge and improve the interaction.
-- **Agents** read the bottom half (Anatomy, States, Tokens, Motion, Access,
-  Rebuild contract) to rebuild the UI faithfully or apply improvements.
+- **The user** reads Essence, Principles, Flows, and Opportunities to judge
+  and improve the interaction.
+- **Agents** use Anatomy, States, Tokens, Motion, Access, and the Rebuild
+  contract to rebuild the UI faithfully or apply improvements.
 
-The flows and the principles behind them matter most. Tokens and measurements
-support them; they are never the point.
+Choose the emphasis from the request; do not ask the user to pick a mode:
+
+- **Analysis:** prioritize flows and the principles behind them.
+- **Reconstruction:** prioritize the appearance and behavior another agent
+  needs to reproduce. Capture distinctive relationships and high-impact
+  details; ordinary implementation choices can use sensible defaults.
+
+A screenshot can support a useful appearance contract while interactions
+remain unknown. Keep unsupported flows, state inventories, and motion brief.
 
 ## Workflow
 
@@ -36,12 +43,17 @@ support them; they are never the point.
    How a source is read (browser, frame extraction, image viewing) is up to
    you and the tools available. Judge flows from the experience the user
    pointed at; take exact values from the most precise source.
-3. **Write.** Follow [template.md](references/template.md). Score flows with
-   [flows.md](references/flows.md). Derive tokens with
-   [tokens.md](references/tokens.md).
-4. **Report.** Give the document path, the 3–5 principles, and the top
-   opportunities with their estimated savings. List any `unknown` values the
-   user could fill in.
+3. **Write.** Adapt [template.md](references/template.md) to the emphasis.
+   Score actionable flows with [flows.md](references/flows.md). Derive tokens
+   with [tokens.md](references/tokens.md), binding them to the actual parts.
+4. **Check.** Reconcile units, dimensions, spacing, and element roles before
+   handing off. When a rebuild or render is in scope, compare it at the
+   chosen scale: bounds, alignment, typography, emphasis, and asset shapes.
+   Record what was checked and the remaining differences; valid token JSON
+   alone does not establish visual fidelity.
+5. **Report.** Give the document path, the 3–5 principles, and the top
+   opportunities with their estimated savings where supportable. State
+   material unknowns and the working assumptions used to proceed.
 
 ## Output location
 
@@ -69,13 +81,19 @@ Nest no deeper than the UI does.
 - **Evidence tags.** Mark every value and claim as `measured` (read from code
   or computed styles), `inferred` (estimated from video, screenshots, or
   patterns), or `unknown`. Add `src` as `path:line` for values read from code.
-  Never present a guess as measured, and never fill a gap to look complete:
-  write `unknown`.
+  Never present a guess as measured. When the original value is unknown,
+  say so; a useful fallback may still be recorded separately as an
+  `inferred` implementation choice.
+- **Proceed with judgment.** Do not require complete source knowledge or
+  ask the user to resolve every unknown. Choose reasonable approximations
+  consistent with the evidence. Ask only when a missing detail materially
+  blocks the requested outcome and cannot be reasonably inferred.
 - **Use the UI's vocabulary.** Name parts and tokens the way the code or the
   product does. Invent names only when none exist, and say so.
 - **Semantic over raw.** Describe colors, spacing, and motion by role
   (`color.action.primary`, `space.inset.md`, `motion.duration.fast`) mapped to
-  raw values. Raw-only lists are not a teardown.
+  raw values. Bind roles to elements, including differently styled spans
+  within a label; token names alone do not specify their placement.
 - **States.** Cover default, hover, focus-visible, active, disabled, loading,
   empty, error, success, and selected wherever they apply, plus any states
   specific to the UI (dragging, editing, placing). Mark each as observed,
@@ -86,5 +104,6 @@ Nest no deeper than the UI does.
 - **Principles are transferable.** Each principle is one imperative rule that
   would carry over to a different component ("Edit inline; never open a modal
   for a single field"), tied to the flows that rely on it. Not "uses blue".
-- **Concise.** Tables over prose for specs. Prose only in Essence, Principles,
-  and flow friction notes. The top half should read in about two minutes.
+- **Concise.** Use tables for specs and prose for intent, reasoning, and
+  important limitations. The user-facing overview should read in about two
+  minutes.

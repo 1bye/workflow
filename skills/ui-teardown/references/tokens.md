@@ -13,12 +13,14 @@ source leaves unnamed, and mark those as `inferred`.
 
 ## When it does not
 
-1. **Collect** every distinct value per category: colors, spacing (padding,
-   gap, margin, offsets), radii, font sizes, weights and line heights,
-   shadows, durations, easings, z-layers.
-2. **Snap to a scale.** Find the base unit the values share (usually 4px or
-   8px) and express each value as a step. Keep values that fit; list the ones
-   that do not under "breaks scale". Do not round them silently.
+1. **Collect** supported values that matter to the UI: colors, spacing
+   (padding, gap, margin, offsets), radii, font sizes, weights and line heights,
+   shadows, durations, easings, z-layers. Skip categories the evidence cannot
+   establish unless an implementation choice is needed.
+2. **Find a scale where supported.** Look for a shared base unit (often 4px
+   or 8px). Preserve estimates that do not fit rather than forcing a grid or
+   silently rounding them. For screenshot values, declare image pixels and
+   the chosen CSS scale before deriving dimensions.
 3. **Assign roles by use:**
    - the most frequent action color → `color.action.primary`; the next →
      `color.action.secondary`
@@ -30,6 +32,17 @@ source leaves unnamed, and mark those as `inferred`.
    - padding inside a container → `space.inset.*`; gaps between siblings →
      `space.stack.*` (vertical) and `space.inline.*` (horizontal)
 4. **Name sizes** `xs sm md lg xl`, in order, per category.
+
+Bind semantic tokens to the actual parts and text spans in Anatomy; a palette
+alone leaves the builder to guess which elements use it. Prioritize typography
+and spacing relationships that distinguish the UI. Use normal defaults for
+incidental details rather than inventing a token for every property.
+
+An unknown original value need not prevent implementation. If a fallback is
+useful (such as a font stack or estimated weight), mark it `inferred` and state
+in `$description` that it is an implementation choice, not a recovered value.
+Keep the original unknown visible in the spec; do not encode `unknown` as a
+fake dimension or color. Otherwise omit unsupported tokens.
 
 ## Categories
 
