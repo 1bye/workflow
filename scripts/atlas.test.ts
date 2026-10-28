@@ -690,7 +690,8 @@ test("floating scenarios become centered step cards and returning restores the o
   const context = createContext({});
 
   runInContext(`
-    const elements = new Map(), visits = [], renders = [];
+    const elements = new Map(), visits = [], renders = [], handlers = new Map();
+    const window = { addEventListener(name, handler) { handlers.set(name, handler); } };
     function fakeElement() {
       return { children: [], attrs: {}, className: "", checked: true, isConnected: true,
         offsetLeft: 0, offsetWidth: 248, clientWidth: 448, scrollLeft: 0,
@@ -717,14 +718,16 @@ test("floating scenarios become centered step cards and returning restores the o
   runInContext(viewer.slice(viewer.indexOf("const MODEL ="), viewer.indexOf("// ---------- layout ----------"))
     .replace("/*__ATLAS_MODEL__*/null", JSON.stringify(model)), context);
   runInContext(viewer.slice(viewer.indexOf("function h("), viewer.indexOf("function showStep(")), context);
+  runInContext(viewer.slice(viewer.indexOf('window.addEventListener("keydown"'), viewer.indexOf('window.addEventListener("resize"')), context);
   runInContext('renderScenarioDock()', context);
   expect(runInContext('$("scenario-track").children.length', context)).toBe(1);
   runInContext('$("scenario-track").children[0].onclick()', context);
-  expect(runInContext('$("scenario-track").children.length', context)).toBe(12);
+  expect(runInContext('$("scenario-track").children.length', context)).toBe(13);
   expect(runInContext('$("scenario-track").children[0].attrs["aria-label"]', context)).toBe("Back to scenarios");
   expect(runInContext('$("scenario-track").children[0].className', context)).toBe("scenario-card back-card");
   expect(runInContext('$("scenario-track").children[0].attrs["aria-current"]', context)).toBeUndefined();
   expect(runInContext('$("scenario-track").children[1].attrs["aria-current"]', context)).toBe("step");
+  expect(runInContext('$("scenario-track").children.at(-1).attrs["aria-label"]', context)).toBe("Back to scenarios");
   expect(runInContext('$("scenario-track").scrollLeft', context)).toBe(268);
 
   for (const step of [4, 10]) {
@@ -736,10 +739,21 @@ test("floating scenarios become centered step cards and returning restores the o
 
   runInContext('setStep(4)', context);
   expect(runInContext('state.focus', context)).toBe("bot");
-  runInContext('$("scenario-track").children[0].onclick()', context);
+  expect(runInContext('$("scenario-track").children.at(-1).attrs["aria-current"]', context)).toBeUndefined();
+  runInContext('$("scenario-track").children.at(-1).onclick()', context);
   expect(runInContext('state.focus', context)).toBe("");
   expect(runInContext('$("scenario-track").className', context)).toBe("scenario-list");
   expect(runInContext('$("scenario-track").children.length', context)).toBe(1);
+
+  for (const step of [0, 4]) {
+    runInContext(`setFlow(flows[0].id); setStep(${step}); state.sel = "bot.state";
+      handlers.get("keydown")({ key: "Escape", target: { tagName: "BUTTON" }, preventDefault() { renders.push("prevented"); } });`, context);
+    expect(runInContext('state.flow', context)).toBeNull();
+    expect(runInContext('state.focus', context)).toBe("");
+    expect(runInContext('$("scenario-track").className', context)).toBe("scenario-list");
+    expect(runInContext('renders.includes("prevented")', context)).toBe(true);
+  }
+
   runInContext('flows.splice(0); renderScenarioDock()', context);
   expect(runInContext('$("scenario-dock").hidden', context)).toBe(true);
 });
@@ -778,6 +792,56 @@ test("camera transitions interpolate view and opacity, and honor reduced motion"
     expect(await animation).toBe(true);
     expect(state.view).toEqual({ x: 100, y: 80, k: 0.5 });
     expect(world.style.opacity).toBe(1);
+  }
+});
+
+test("scenario camera fits repeated cards, routed bends, and labels above the dock on wide and narrow screens", () => {
+  for (const width of [1000, 390]) {
+    const boxes = new Map<string, Box>([
+      ["source", { id: "source", p: "source", x: 300, y: 100, w: 250, h: 140 }],
+      ...[80, 260, 440].map((y, i): [string, Box] => ["worker" + i, { id: "worker" + i, p: "worker", x: 900, y, w: 180, h: 90 }]),
+    ]);
+
+    const label = { x: 100, y: 300, width: 120, height: 16 };
+    const points = [{ x: 550, y: 170 }, { x: 60, y: 170 }, { x: 60, y: 480 }, { x: 900, y: 480 }];
+    const arc = { a: { x: 600, y: 170 }, b: { x: 900, y: 125 }, c1: { x: 700, y: -50 }, c2: { x: 800, y: -50 } };
+    const state = { focus: "", step: 0, flow: { steps: [{ from: "source.child", to: "worker.child", label: "assign a very long run label" }] } };
+
+    const context = createContext({
+      state,
+      svg: { getBoundingClientRect: () => ({ width, height: 700, top: 30 }) },
+      $: () => ({ hidden: false, getBoundingClientRect: () => ({ top: 550 }) }),
+      proxy: (p: string) => p.split(".")[0],
+    });
+
+    runInContext(viewer.slice(viewer.indexOf("function scenarioView("), viewer.indexOf("// ---------- camera animation ----------")), context);
+
+    const L = { boxes, edges: [
+      { s: "source", t: "worker0", pts: points, label },
+      { s: "source", t: "worker1", arcs: [arc] },
+    ] };
+
+    context.testLayout = L;
+
+    const view = runInContext("scenarioView(testLayout)", context) as { x: number; y: number; k: number };
+    const flowLabelWidth = state.flow.steps[0]!.label.length * 6.1 + 18;
+
+    const corners = [
+      ...[...boxes.values()].flatMap((b) => [{ x: b.x, y: b.y }, { x: b.x + b.w, y: b.y + b.h }]),
+      ...points, arc.c1, arc.c2,
+      { x: label.x + label.width / 2 - flowLabelWidth / 2, y: label.y - 2 },
+      { x: label.x + label.width / 2 + flowLabelWidth / 2, y: label.y + label.height + 2 },
+    ];
+
+    for (const p of corners) {
+      expect(view.x + p.x * view.k).toBeGreaterThanOrEqual(40 - 0.001);
+      expect(view.x + p.x * view.k).toBeLessThanOrEqual(width - 40 + 0.001);
+      expect(view.y + p.y * view.k).toBeGreaterThanOrEqual(72 - 0.001);
+      expect(view.y + p.y * view.k).toBeLessThanOrEqual(496 + 0.001);
+    }
+
+    expect(view.k).toBeGreaterThan(0);
+    expect(view.k).toBeLessThanOrEqual(1.3);
   }
 });
 
@@ -857,7 +921,7 @@ test("returning to a canvas restores its own pan and zoom and first visits still
   const overview = { x: 132, y: -45, k: 1.7 };
   const botView = { x: -200, y: 60, k: 2.2 };
   const firstVisit = { x: 20, y: 30, k: 0.9 };
-  const state = { focus: "", view: { x: -999, y: -999, k: 4 }, layout: null as object | null, flow: null };
+  const state = { focus: "", view: { x: -999, y: -999, k: 4 }, layout: null as object | null, flow: null as object | null };
   const viewMemory = new Map([["", { ...overview }]]);
   const world = { textContent: "", style: { opacity: 1 }, setAttribute() {} };
   let fits = 0;
@@ -874,6 +938,8 @@ test("returning to a canvas restores its own pan and zoom and first visits still
  return { ...firstVisit }; },
     el: () => ({}),
     crumbs() {},
+    showStep() {},
+    scenarioView: () => ({ x: 80, y: 90, k: 1.3 }),
     tween: (to: typeof overview, _ms: number, opacity: number) => { state.view = { ...to }; world.style.opacity = opacity;
 
  return Promise.resolve(true); },
@@ -902,4 +968,17 @@ test("returning to a canvas restores its own pan and zoom and first visits still
   expect(state.view).toEqual(botView);
   expect(viewMemory.get("bot")).not.toBe(state.view);
   expect(fits).toBe(1);
+
+  state.flow = {};
+  await runInContext("render({ keepView: true })", context);
+  expect(state.view).toEqual({ x: 80, y: 90, k: 1.3 });
+  expect(viewMemory.get("bot")).toEqual(botView);
+
+  state.view.x += 100;
+  runInContext("applyView(true)", context);
+  expect(viewMemory.get("bot")).toEqual(botView);
+
+  state.flow = null;
+  await runInContext("render({ animate: true })", context);
+  expect(state.view).toEqual(botView);
 });

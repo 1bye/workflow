@@ -9,7 +9,7 @@
 <script src="https://cdn.jsdelivr.net/npm/elkjs@0.9.3/lib/elk.bundled.js"></script>
 <style>
 :root {
-  --bg: #f2f2f2; --surface: #ffffff; --ink: #141414; --soft: #606060; --muted: #8c8c8c; --line: #dcdcdc;
+  --bg: #f2f2f2; --surface: #ffffff; --ink: #141414; --soft: #474747; --muted: #6b6b6b; --line: #dcdcdc;
   --edge: #a6a6a6; --accent: #141414; --glass: rgb(255 255 255 / .6);
   --c-client: #4a82d8; --c-service: #7c5cd6; --c-code: #e07a3f; --c-data: #2e9e6a; --c-ext: #8c8c8c;
   --sans: "Geist", ui-sans-serif, system-ui, sans-serif; --mono: "Geist Mono", ui-monospace, Menlo, monospace;
@@ -17,14 +17,14 @@
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #141414; --surface: #1c1c1c; --ink: #ededed; --soft: #a3a3a3; --muted: #737373; --line: #2e2e2e;
+    --bg: #141414; --surface: #1c1c1c; --ink: #ededed; --soft: #c7c7c7; --muted: #949494; --line: #2e2e2e;
     --edge: #5c5c5c; --accent: #ededed; --glass: rgb(255 255 255 / .05);
     --c-client: #6f9ee6; --c-service: #a08af0; --c-code: #f0915a; --c-data: #4cc28a; --c-ext: #9a9a9a;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #141414; --surface: #1c1c1c; --ink: #ededed; --soft: #a3a3a3; --muted: #737373; --line: #2e2e2e;
+  --bg: #141414; --surface: #1c1c1c; --ink: #ededed; --soft: #c7c7c7; --muted: #949494; --line: #2e2e2e;
   --edge: #5c5c5c; --accent: #ededed; --glass: rgb(255 255 255 / .05);
   --c-client: #6f9ee6; --c-service: #a08af0; --c-code: #f0915a; --c-data: #4cc28a; --c-ext: #9a9a9a;
   color-scheme: dark;
@@ -76,16 +76,18 @@ svg#canvas.dragging { cursor: grabbing; }
 .node .halo { fill: color-mix(in oklab, var(--c) 9%, var(--bg)); transition: fill .15s; }
 .node:hover .halo { fill: color-mix(in oklab, var(--c) 14%, var(--bg)); }
 .node.sel .halo { stroke: var(--ink); stroke-width: 1; }
-.node.ghost { opacity: .45; }
+.node.ghost { opacity: .6; }
 .node.ghost:hover { opacity: .8; }
 .node.inferred .icon { stroke-dasharray: 3 2; }
 .node .l { font-size: 13px; font-weight: 500; fill: var(--ink); }
 .node .bare-l { font-size: 12px; font-weight: 400; fill: var(--soft); }
 .node .k { font: 10px var(--mono); fill: var(--muted); }
-.node .p { font-size: 12px; fill: var(--muted); }
+.node .p { font-size: 12px; fill: var(--soft); }
 .container-heading { cursor: pointer; outline: none; }
-.container-heading .open-label { font: 10px var(--mono); fill: var(--muted); }
-.container-heading:hover .open-label, .container-heading:focus-visible .open-label { fill: var(--ink); }
+.open-btn circle { fill: var(--surface); transition: fill .15s; }
+.open-btn path { fill: none; stroke: var(--ink); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; transition: stroke .15s; }
+.container-heading:hover .open-btn circle, .container-heading:focus-visible .open-btn circle { fill: var(--ink); }
+.container-heading:hover .open-btn path, .container-heading:focus-visible .open-btn path { stroke: var(--bg); }
 .container-heading:focus-visible .heading-hit { stroke: var(--ink); stroke-width: 1; }
 .tile .outline { fill: var(--surface); stroke: none; }
 .tile text { font-size: 12px; fill: var(--ink); }
@@ -247,7 +249,7 @@ function kindLine(n) {
 const bare = (b) => b.ghost || (!b.frame && !kids(byPath.get(b.p)).length);
 const bareW = (n, extra = "") => Math.max(76, n.label.length * 6.8 + 16, extra.length * 6.2 + 16);
 function size(n, ghost) {
-  const labelW = n.label.length * 7.6 + kindLine(n).length * 6.2 + 64;
+  const labelW = n.label.length * 7.6 + kindLine(n).length * 6.2 + 64 + (drillable(n) ? 32 : 0);
   if (ghost) return { w: bareW(n, "in " + byPath.get(parentOf(n.path)).label), h: bareH + 14 };
   if (!kids(n).length) return { w: bareW(n), h: bareH };
   if (tagged(n)) {
@@ -619,13 +621,46 @@ let overlayAnim = null;
 function applyView(remember = false) {
   const { x, y, k } = state.view;
   world.setAttribute("transform", `translate(${x},${y}) scale(${k})`);
-  if (remember && state.layout?.focus === state.focus) viewMemory.set(state.focus, { x, y, k });
+  if (remember && !state.flow && state.layout?.focus === state.focus) viewMemory.set(state.focus, { x, y, k });
 }
 function fitView(L) {
   const r = svg.getBoundingClientRect();
   const height = Math.max(100, r.height - (flows.length ? 164 : 0));
   const k = Math.min(1.3, (r.width - 32) / L.w, (height - 32) / L.h);
   return { k, x: (r.width - L.w * k) / 2, y: (height - L.h * k) / 2 };
+}
+function scenarioView(L) {
+  const step = state.flow.steps[state.step], a = proxy(step.from, state.focus), b = proxy(step.to, state.focus);
+  const boxes = [...L.boxes.values()].filter((box) => box.p === a || box.p === b), points = [];
+  const rect = (x, y, w, h) => points.push({ x, y }, { x: x + w, y: y + h });
+  for (const box of boxes) rect(box.x, box.y, box.w, box.h);
+  const routes = L.edges.filter((e) => {
+    const s = L.boxes.get(e.s)?.p, t = L.boxes.get(e.t)?.p;
+    return (s === a && t === b) || (s === b && t === a);
+  });
+  if (!routes.length && a !== b) {
+    const from = boxes.find((box) => box.p === a), to = boxes.find((box) => box.p === b);
+    const route = from && to && compactRoute({ s: from.id, t: to.id, text: step.label || "" }, L.boxes, L.edges);
+    if (route) routes.push(route);
+  }
+  for (const route of routes) {
+    const path = [...(route.pts || []), ...(route.arcs || []).flatMap((arc) => [arc.a, arc.b, arc.c1, arc.c2])];
+    points.push(...path);
+    const label = route.bundleLabel || route.label;
+    const w = (step.label || "").length * 6.1 + 18;
+    if (label) {
+      rect(label.x, label.y, label.width, label.height);
+      rect(label.x + label.width / 2 - w / 2, label.y + label.height / 2 - 10, w, 20);
+    } else if (step.label) for (const p of path) rect(p.x - w / 2, p.y - 10, w, 20);
+  }
+  if (!points.length) return fitView(L);
+  const x = Math.min(...points.map((p) => p.x)), y = Math.min(...points.map((p) => p.y));
+  const w = Math.max(...points.map((p) => p.x)) - x, h = Math.max(...points.map((p) => p.y)) - y;
+  const r = svg.getBoundingClientRect(), dock = $("scenario-dock");
+  const bottom = dock.hidden ? r.height : dock.getBoundingClientRect().top - r.top;
+  const width = Math.max(1, r.width - 80), height = Math.max(1, bottom - 24 - 72);
+  const k = Math.min(1.3, width / Math.max(1, w), height / Math.max(1, h));
+  return { k, x: 40 + (width - w * k) / 2 - x * k, y: 72 + (height - h * k) / 2 - y * k };
 }
 // ---------- camera animation ----------
 let viewAnimation = null, renderVersion = 0;
@@ -688,17 +723,18 @@ async function render(opts = {}) {
   }
   for (const b of all.filter((b) => !b.frame)) drawNode(gNodes, b);
 
-  if (opts.keepView) { world.style.opacity = 1; applyView(true); }
+  if (opts.keepView && !state.flow) { world.style.opacity = 1; applyView(true); }
   else {
-    const target = { ...(viewMemory.get(state.focus) || fitView(L)) };
-    viewMemory.set(state.focus, { ...target });
+    const target = state.flow ? scenarioView(L) : { ...(viewMemory.get(state.focus) || fitView(L)) };
+    if (!state.flow) viewMemory.set(state.focus, { ...target });
     if (opts.zoomIn || opts.zoomOut) {
       const scale = opts.zoomIn ? 0.8 : 1.16, r = svg.getBoundingClientRect();
       state.view = { k: target.k * scale, x: r.width / 2 - (r.width / 2 - target.x) * scale, y: r.height / 2 - (r.height / 2 - target.y) * scale };
       world.style.opacity = 0;
       applyView();
       tween(target, 260, 1);
-    } else { state.view = target; world.style.opacity = 1; applyView(); }
+    } else if (state.flow || opts.animate) tween(target, 360, 1);
+    else { state.view = target; world.style.opacity = 1; applyView(); }
   }
   crumbs();
   if (state.flow) showStep();
@@ -769,12 +805,14 @@ function shell(parent, b, extra) {
   if (open) el("rect", { class: "heading-hit", x: 4, y: 4, width: b.w - 8, height: contentTop(n) - 4, rx: 4, fill: "transparent" }, heading);
   icon(heading, n.kind, tilePad, 11, 15);
   text(heading, "l", tilePad + 22, 23, n.label);
-  text(heading, "k", b.w - tilePad, 23, kindLine(n)).setAttribute("text-anchor", "end");
+  text(heading, "k", tilePad + 30 + n.label.length * 7.4, 23, kindLine(n));
   if (!b.ghost && kids(n).length && n.desc) {
-    summaryLines(n, b.w - tilePad * 2 - (open ? 64 : 0)).forEach((line, i) => text(heading, "p", tilePad, 47 + i * 17, line));
+    summaryLines(n, b.w - tilePad * 2).forEach((line, i) => text(heading, "p", tilePad, 47 + i * 17, line));
   }
   if (open) {
-    text(heading, "open-label", b.w - tilePad, kindLine(n) ? 41 : 23, "open ↗").setAttribute("text-anchor", "end");
+    const btn = el("g", { class: "open-btn", transform: `translate(${b.w - 36},8)` }, heading);
+    el("circle", { cx: 12, cy: 12, r: 12 }, btn);
+    el("path", { d: "M9.5 14.5l5-5M10.5 9.5h4v4" }, btn);
     heading.addEventListener("click", (ev) => { if (dragMoved) return; ev.stopPropagation(); drill(b); });
     heading.addEventListener("keydown", (ev) => {
       if (ev.key !== "Enter" && ev.key !== " ") return;
@@ -870,13 +908,16 @@ function renderScenarioDock() {
   track.className = f ? "step-list" : "scenario-list";
   track.setAttribute("aria-label", f ? f.label + " steps" : "Scenarios");
   if (f) {
-    const back = h("button", { className: "scenario-card back-card", onclick: () => setFlow(null) },
-      h("span", { className: "eyebrow", textContent: "← Back" }),
-      h("strong", { textContent: "All scenarios" }),
-      h("span", { className: "detail", textContent: f.label }),
-    );
-    back.setAttribute("aria-label", "Back to scenarios");
-    track.append(back);
+    const back = () => {
+      const card = h("button", { className: "scenario-card back-card", onclick: () => setFlow(null) },
+        h("span", { className: "eyebrow", textContent: "← Back" }),
+        h("strong", { textContent: "All scenarios" }),
+        h("span", { className: "detail", textContent: f.label }),
+      );
+      card.setAttribute("aria-label", "Back to scenarios");
+      return card;
+    };
+    track.append(back());
     f.steps.forEach((s, i) => {
       const route = byPath.get(s.from).label + " → " + byPath.get(s.to).label;
       const card = h("button", { className: "scenario-card step-card", onclick: () => setStep(i) },
@@ -887,6 +928,7 @@ function renderScenarioDock() {
       card.setAttribute("aria-label", `Step ${i + 1}: ${s.label || route}. ${route}`);
       track.append(card);
     });
+    track.append(back());
     updateScenarioCards();
   } else {
     flows.filter((flow) => flow.steps.length).forEach((flow, i) => track.append(
@@ -902,7 +944,7 @@ function renderScenarioDock() {
 function updateScenarioCards() {
   const f = state.flow;
   if (!f) return;
-  const track = $("scenario-track"), cards = [...track.children].slice(1);
+  const track = $("scenario-track"), cards = [...track.children].slice(1, -1);
   cards.forEach((card, i) => {
     card.classList.toggle("active", i === state.step);
     if (i === state.step) card.setAttribute("aria-current", "step");
@@ -937,7 +979,7 @@ function setFlow(id) {
     const target = stepFocus(state.flow.steps[0]);
     if (target !== state.focus) return go(target);
   }
-  render({ keepView: true });
+  render({ keepView: !!state.flow, animate: !state.flow });
 }
 function setStep(i) {
   const f = state.flow;
@@ -946,7 +988,9 @@ function setStep(i) {
   updateScenarioCards();
   const target = stepFocus(f.steps[state.step]);
   if (target !== state.focus) return go(target);
+  if (state.layout?.focus !== state.focus) return;
   showStep();
+  tween(scenarioView(state.layout), 360, 1);
 }
 function showStep() {
   const f = state.flow, s = f.steps[state.step], L = state.layout;
@@ -1042,7 +1086,10 @@ svg.addEventListener("gesturechange", (e) => {
 svg.addEventListener("gestureend", (e) => { e.preventDefault(); gestureScale = null; }, { passive: false });
 window.addEventListener("keydown", (e) => {
   if (["INPUT", "BUTTON"].includes(e.target.tagName) && e.key === " ") return;
-  if (e.key === "Escape") state.sel ? select(null) : state.focus && go(parentOf(state.focus), state.focus);
+  if (e.key === "Escape") {
+    if (state.flow) { e.preventDefault(); setFlow(null); return; }
+    state.sel ? select(null) : state.focus && go(parentOf(state.focus), state.focus);
+  }
   if (!state.flow) return;
   if (e.key === "ArrowRight") { e.preventDefault(); setStep(state.step + 1); }
   if (e.key === "ArrowLeft") { e.preventDefault(); setStep(state.step - 1); }
@@ -1059,7 +1106,7 @@ function zoomBy(factor) {
 }
 $("zoom-in").onclick = () => zoomBy(1.25);
 $("zoom-out").onclick = () => zoomBy(0.8);
-$("zoom-fit").onclick = () => state.layout && tween(fitView(state.layout), 260, 1);
+$("zoom-fit").onclick = () => state.layout && tween(state.flow ? scenarioView(state.layout) : fitView(state.layout), 260, 1);
 $("theme").onclick = () => {
   const dark = matchMedia("(prefers-color-scheme: dark)").matches;
   const cur = document.documentElement.dataset.theme || (dark ? "dark" : "light");
