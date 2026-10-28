@@ -312,15 +312,27 @@ function compactGraph(graph, boxes, drawn) {
 // shortcut: try short orthogonal routes; a full router is only needed to compact maze-like frames.
 function compactRoute(d, boxes) {
   const a = boxes.get(d.s), b = boxes.get(d.t);
-  const obstacles = [...boxes.values()].filter((n) => !n.frame || (!has(n.p, a.p) && !has(n.p, b.p)));
+  const all = [...boxes.values()];
+  const ancestors = (n) => all.filter((f) => f.frame && f.id !== n.id && has(f.p, n.p));
+  const headers = all.filter((n) => n.frame).map((n) => ({ ...n, h: Math.min(n.h, contentTop(byPath.get(n.p)) + 8) }));
+  const obstacles = [...all.filter((n) => !n.frame || !(has(n.p, a.p) && has(n.p, b.p))), ...headers];
   const intersects = (r, n, pad = 0) => r.x < n.x + n.w + pad && r.x + r.w > n.x - pad && r.y < n.y + n.h + pad && r.y + r.h > n.y - pad;
-  const clear = (p, q) => !obstacles.some((n) => intersects({ x: Math.min(p.x, q.x), y: Math.min(p.y, q.y), w: Math.abs(p.x - q.x), h: Math.abs(p.y - q.y) }, n, 12));
-  const ports = (n) => [
-    [{ x: n.x + n.w / 2, y: n.y }, { x: n.x + n.w / 2, y: n.y - 24 }],
-    [{ x: n.x + n.w / 2, y: n.y + n.h }, { x: n.x + n.w / 2, y: n.y + n.h + 24 }],
-    [{ x: n.x, y: n.y + n.h / 2 }, { x: n.x - 24, y: n.y + n.h / 2 }],
-    [{ x: n.x + n.w, y: n.y + n.h / 2 }, { x: n.x + n.w + 24, y: n.y + n.h / 2 }],
-  ];
+  const clear = (p, q, blocks = obstacles) => !blocks.some((n) => intersects({ x: Math.min(p.x, q.x), y: Math.min(p.y, q.y), w: Math.abs(p.x - q.x), h: Math.abs(p.y - q.y) }, n, 12));
+  // External links cross their frame in one straight stub; every bend stays outside.
+  const ports = (n, other) => {
+    const own = ancestors(n), exits = own.filter((f) => !has(f.p, other.p));
+    const blocks = [...all.filter((f) => f.id !== n.id && !own.includes(f) && (!f.frame || !has(f.p, other.p))), ...headers];
+    const options = [
+      [{ x: n.x + n.w / 2, y: n.y }, { x: n.x + n.w / 2, y: Math.min(n.y, ...exits.map((f) => f.y)) - 24 }],
+      [{ x: n.x + n.w / 2, y: n.y + n.h }, { x: n.x + n.w / 2, y: Math.max(n.y + n.h, ...exits.map((f) => f.y + f.h)) + 24 }],
+      [{ x: n.x, y: n.y + n.h / 2 }, { x: Math.min(n.x, ...exits.map((f) => f.x)) - 24, y: n.y + n.h / 2 }],
+      [{ x: n.x + n.w, y: n.y + n.h / 2 }, { x: Math.max(n.x + n.w, ...exits.map((f) => f.x + f.w)) + 24, y: n.y + n.h / 2 }],
+    ].filter(([start, exit]) => [start, exit].every((p) => p.x >= 8 && p.y >= 8) && clear(start, exit, blocks));
+    if (!exits.length) return options;
+    const distance = ([p, q]) => Math.abs(p.x - q.x) + Math.abs(p.y - q.y);
+    const nearest = Math.min(...options.map(distance));
+    return options.filter((port) => distance(port) <= nearest + 1);
+  };
   const xs = [...new Set(obstacles.flatMap((n) => [n.x - 24, n.x + n.w + 24]))];
   const ys = [...new Set(obstacles.flatMap((n) => [n.y - 24, n.y + n.h + 24]))];
   const labelFor = (pts) => {
@@ -337,7 +349,7 @@ function compactRoute(d, boxes) {
     return null;
   };
   let best = null, bestCost = Infinity;
-  for (const [start, exit] of ports(a)) for (const [end, entry] of ports(b)) {
+  for (const [start, exit] of ports(a, b)) for (const [end, entry] of ports(b, a)) {
     const routes = [
       [exit, { x: entry.x, y: exit.y }, entry],
       [exit, { x: exit.x, y: entry.y }, entry],
@@ -387,7 +399,8 @@ function readLayout(g, boxes, drawn, deferred = new Set()) {
   })(g, 0, 0);
   const routed = new Map(g.edges.map((e) => [e.id, e]));
   const edges = drawn.map((d, i) => {
-    if (deferred.has("e" + i)) return compactRoute(d, placed);
+    const a = placed.get(d.s), b = placed.get(d.t);
+    if (deferred.has("e" + i) || [...placed.values()].some((f) => f.frame && (has(f.p, a.p) || has(f.p, b.p)))) return compactRoute(d, placed);
     const e = routed.get("e" + i), s = e.sections?.[0], o = origin.get(e.container) || origin.get("root");
     const shift = (p) => ({ x: p.x + o.x, y: p.y + o.y });
     const l = e.labels?.[0], labelW = d.text.length * 6.8 + 10;
@@ -430,7 +443,14 @@ function bundleEdges(L) {
       const ys = participants.map((b) => mid(b).y);
       const corridor = { x: sourceBoundary + 16, y: Math.min(...ys) - 8, w: gap - 32, h: Math.max(...ys) - Math.min(...ys) + 16 };
       const trunkCorridor = { x: Math.max(...sources.map((b) => b.x + b.w)), y: commonY - 8, w: Math.min(...targets.map((b) => b.x)) - Math.max(...sources.map((b) => b.x + b.w)), h: 16 };
-      const blocked = all.some((b) => !participants.some((p) => b.id === p.id || (b.frame && has(b.p, p.p))) && (overlaps(corridor, b, 8) || overlaps(trunkCorridor, b, 8)));
+      const peerFrames = peers.some((p) => all.some((b) => b.frame && has(b.p, p.p) && !has(b.p, common.p)));
+      const commonFramed = all.some((b) => b.frame && has(b.p, common.p) && !peers.some((p) => has(b.p, p.p)));
+      const safeExit = !commonFramed || edges.every((e) => {
+        const p = outgoing ? e.pts?.[0] : e.pts?.at(-1), q = outgoing ? e.pts?.[1] : e.pts?.at(-2);
+        return p && q && p.y === commonY && q.y === commonY && p.x === (outgoing ? common.x + common.w : common.x)
+          && (outgoing ? q.x >= sourceBoundary + 12 : q.x <= targetBoundary - 12);
+      });
+      const blocked = peerFrames || !safeExit || all.some((b) => !participants.some((p) => b.id === p.id || (b.frame && has(b.p, p.p))) && (overlaps(corridor, b, 8) || overlaps(trunkCorridor, b, 8)));
       // Other arrangements keep their individually routed, rounded connectors.
       if (Math.max(...peerXs) - Math.min(...peerXs) < 2 && gap > Math.max(208, labelW + 144) && !blocked) {
         const trunkSpan = Math.max(labelW + 48, gap * 0.45);
@@ -524,18 +544,19 @@ async function layout(level) {
     try {
       const compact = compactGraph(graph, boxes, drawn);
       const candidate = readLayout(await elk.layout(compact.graph), boxes, drawn, compact.deferred);
-      if (candidate && layoutCost(candidate) < layoutCost(result)) result = candidate;
+      if (candidate && (!result || layoutCost(candidate) < layoutCost(result))) result = candidate;
     } catch (error) { console.warn("Atlas kept the standard layout:", error); }
-  } else {
-    // Offline fallback: frames are dropped and every unit goes on a grid.
-    for (const [id, b] of boxes) if (b.frame) boxes.delete(id);
+  }
+  if (!result) {
+    // Keep every endpoint when safe frame routing is unavailable.
+    for (const b of boxes.values()) if (b.frame) Object.assign(b, { frame: false, ...size(byPath.get(b.p), false) });
     const cols = Math.ceil(Math.sqrt(boxes.size));
     const cellW = Math.max(320, ...[...boxes.values()].map((b) => b.w + 32));
     const cellH = Math.max(150, ...[...boxes.values()].map((b) => b.h + 32));
     let i = 0;
     for (const b of boxes.values()) { b.x = 24 + (i % cols) * cellW; b.y = 24 + Math.floor(i / cols) * cellH; i++; }
     result = { boxes, edges: drawn.map((d) => ({ ...d, pts: null })), w: cols * cellW + 24, h: Math.ceil(boxes.size / cols) * cellH + 24 };
-    $("notice").textContent = "Layout engine unavailable (offline?) — using grid layout.";
+    $("notice").textContent = elk ? "No clear routes between frames — using grid layout." : "Layout engine unavailable (offline?) — using grid layout.";
   }
   result.focus = level.focus;
   result.connectors = bundleEdges(result);
@@ -901,10 +922,12 @@ function showStep() {
   }
   for (const g of world.querySelectorAll(".edge")) g.classList.add("dim");
   if (!ba || !bb || a === b) return;
+  const route = L.edges.find((e) => (e.s === ba.id && e.t === bb.id) || (e.s === bb.id && e.t === ba.id))
+    || compactRoute({ s: ba.id, t: bb.id, text: s.label || "" }, L.boxes);
+  if (!route) return;
   const p0 = edgePoint(ba, center(bb)), p1 = edgePoint(bb, center(ba));
   const mx = (p0.x + p1.x) / 2, my = (p0.y + p1.y) / 2, dx = p1.x - p0.x, dy = p1.y - p0.y;
   const c = { x: mx - dy * 0.18, y: my + dx * 0.18 };
-  const route = L.edges.find((e) => (e.s === ba.id && e.t === bb.id) || (e.s === bb.id && e.t === ba.id));
   const pts = route?.pts && (route.s === ba.id ? route.pts : [...route.pts].reverse());
   const arcs = route?.arcs && (route.s === ba.id ? route.arcs : reverseArcs(route.arcs));
   const g = el("g", { class: "flow" }, overlay);

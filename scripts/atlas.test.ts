@@ -116,7 +116,7 @@ type Point = { x: number; y: number };
 type Route = { pts: Point[]; label: false | { x: number; y: number; width: number; height: number } };
 type Arc = { a: Point; b: Point; c1: Point; c2: Point };
 type Meaning = { s: string; t: string; fwd: boolean; back: boolean };
-type BundleEdge = { s: string; t: string; m: Meaning; text: string; arcs?: Arc[] };
+type BundleEdge = { s: string; t: string; m: Meaning; text: string; pts?: Point[]; arcs?: Arc[] };
 type Connector = { m: Meaning; strokes: { arcs?: Arc[]; pts?: Point[]; startArrow: boolean; endArrow: boolean }[]; label?: false | { text: string; x: number; y: number; width: number; height: number } };
 
 function compactHelpers() {
@@ -309,6 +309,123 @@ test("a blocked compact route rejects the candidate so standard routing can be k
   expect(layoutCost({ w: 1400, h: 1000 })).toBeLessThan(layoutCost({ w: 2800, h: 500 }));
 });
 
+test("external routes exit frames immediately and never cross frame headings", () => {
+  const { compactRoute, readLayout } = compactHelpers();
+  const frame = { id: "server", p: "server", x: 100, y: 220, w: 320, h: 480, frame: true };
+
+  const boxes = new Map<string, Box>([
+    ["server", frame],
+    ["server.input", { id: "server.input", p: "server.input", x: 124, y: 320, w: 272, h: 120 }],
+    ["server.worker", { id: "server.worker", p: "server.worker", x: 124, y: 540, w: 272, h: 120 }],
+    ["screen", { id: "screen", p: "screen", x: 148, y: 32, w: 240, h: 100 }],
+    ["storage", { id: "storage", p: "storage", x: 220, y: 820, w: 80, h: 96 }],
+  ]);
+
+  for (const [s, t, text] of [
+    ["server.input", "storage", "records"], ["storage", "server.input", "records"],
+    ["screen", "server.input", "commands · events"], ["server.input", "screen", "commands · events"],
+  ]) {
+    const edge = { s: s!, t: t!, text: text! };
+    const route = compactRoute(edge, boxes)!;
+
+    expect(route).not.toBeNull();
+    expect(route.label).toBeTruthy();
+
+    for (let i = 1; i < route.pts.length; i++) {
+      const a = route.pts[i - 1]!, b = route.pts[i]!;
+      const insideX = Math.max(a.x, b.x) > frame.x && Math.min(a.x, b.x) < frame.x + frame.w;
+      const insideY = Math.max(a.y, b.y) > frame.y && Math.min(a.y, b.y) < frame.y + frame.h;
+
+      if (insideX && insideY) {
+        expect(i === 1 || i === route.pts.length - 1).toBe(true);
+        expect(a.y).toBe(b.y);
+        expect(a.y).toBeGreaterThan(frame.y + 40);
+      }
+    }
+
+    if (route.label) {
+      const l = route.label;
+
+      expect(l.x + l.width <= frame.x || l.x >= frame.x + frame.w || l.y + l.height <= frame.y || l.y >= frame.y + frame.h).toBe(true);
+    }
+
+    // Even a standard engine route through the heading must be replaced.
+    const result = readLayout({ width: 700, height: 1000, children: [], edges: [{
+      id: "e0", sections: [{ startPoint: { x: 260, y: 132 }, endPoint: { x: 260, y: 320 } }],
+    }] }, boxes, [edge], new Set()) as { edges: Route[] };
+
+    expect(result.edges[0]!.pts).toEqual(route.pts);
+  }
+});
+
+test("nested frame exits stay straight through every ancestor boundary", () => {
+  const { compactRoute } = compactHelpers();
+
+  const frames = [
+    { id: "server", p: "server", x: 100, y: 160, w: 360, h: 540, frame: true },
+    { id: "server.input", p: "server.input", x: 124, y: 240, w: 312, h: 250, frame: true },
+  ];
+
+  const boxes = new Map<string, Box>([
+    ...frames.map((f): [string, Box] => [f.id, f]),
+    ["part", { id: "part", p: "server.input.part", x: 148, y: 320, w: 264, h: 100 }],
+    ["storage", { id: "storage", p: "storage", x: 240, y: 820, w: 80, h: 96 }],
+  ]);
+
+  const route = compactRoute({ s: "part", t: "storage", text: "records" }, boxes)!;
+
+  expect(route).not.toBeNull();
+
+  for (const frame of frames) for (let i = 1; i < route.pts.length; i++) {
+    const a = route.pts[i - 1]!, b = route.pts[i]!;
+
+    if (Math.max(a.x, b.x) > frame.x && Math.min(a.x, b.x) < frame.x + frame.w && Math.max(a.y, b.y) > frame.y && Math.min(a.y, b.y) < frame.y + frame.h) {
+      expect(i).toBe(1);
+      expect(a.y).toBe(b.y);
+      expect(a.y).toBeGreaterThan(frame.y + 40);
+    }
+  }
+});
+
+test("flow-only links use the frame router instead of drawing an unsafe fallback curve", () => {
+  const attempts: object[] = [];
+
+  const context = createContext({
+    state: { focus: "", step: 0, flow: { steps: [{ from: "server.input", to: "storage", label: "records" }] }, layout: {
+      boxes: new Map([["server.input", { id: "server.input" }], ["storage", { id: "storage" }]]), edges: [],
+    } },
+    proxy: (p: string) => p,
+    $: () => ({ textContent: "" }),
+    world: { querySelectorAll: () => [] },
+    overlayAnim: null,
+    compactRoute: (edge: object) => { attempts.push(edge);
+
+ return null; },
+  });
+
+  runInContext(viewer.slice(viewer.indexOf("function showStep("), viewer.indexOf("function edgePoint(")), context);
+  runInContext("showStep()", context);
+  expect(attempts).toEqual([{ s: "server.input", t: "storage", text: "records" }]);
+});
+
+test("the grid fallback keeps frames as closed cards so no connection loses an endpoint", async () => {
+  const { context } = compactHelpers();
+
+  runInContext('edgesAll.push({ from: "server", to: "storage", label: "records" })', context);
+
+  const result = await runInContext('layout(buildLevel("", null))', context) as {
+    boxes: Map<string, Box>;
+    edges: { s: string; t: string }[];
+    connectors: Connector[];
+  };
+
+  expect(result.boxes.get("server")!.frame).toBe(false);
+  expect(result.boxes.has("server.input")).toBe(true);
+  expect(result.edges).toHaveLength(1);
+  expect(result.edges.every((e) => result.boxes.has(e.s) && result.boxes.has(e.t))).toBe(true);
+  expect(result.connectors).toHaveLength(1);
+});
+
 function repeatedConnections() {
   const boxes = new Map<string, Box>([
     ["source", { id: "source", p: "source", x: 40, y: 130, w: 120, h: 60 }],
@@ -388,9 +505,29 @@ test("a sibling above the trunk inside its source frame does not prevent curved 
   layout.boxes.get("source")!.p = "server.worker";
   layout.boxes.set("frame", { id: "frame", p: "server", x: 20, y: 0, w: 160, h: 210, frame: true });
   layout.boxes.set("sibling", { id: "sibling", p: "server.input", x: 40, y: 20, w: 120, h: 60 });
+
+  for (const edge of layout.edges.filter((e) => e.m === layout.outgoing)) {
+    edge.pts = [{ x: 160, y: 160 }, { x: 204, y: 160 }];
+  }
+
   expect(bundleEdges(layout).find((c) => c.m === layout.outgoing)!.strokes).toHaveLength(4);
 
   layout.boxes.get("sibling")!.y = 140;
+  expect(bundleEdges(layout).filter((c) => c.m === layout.outgoing)).toHaveLength(3);
+});
+
+test("bundling cannot replace a safe frame exit with a different side", () => {
+  const { bundleEdges } = compactHelpers();
+  const layout = repeatedConnections();
+
+  layout.boxes.get("source")!.p = "server.worker";
+  layout.boxes.set("frame", { id: "frame", p: "server", x: 32, y: 0, w: 280, h: 340, frame: true });
+
+  for (const edge of layout.edges.filter((e) => e.m === layout.outgoing)) {
+    layout.boxes.get(edge.t)!.x = 700;
+    edge.pts = [{ x: 40, y: 160 }, { x: 8, y: 160 }];
+  }
+
   expect(bundleEdges(layout).filter((c) => c.m === layout.outgoing)).toHaveLength(3);
 });
 

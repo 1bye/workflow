@@ -62,6 +62,14 @@ box you open later. Children of `chips` and `choice` should be leaves. `count`
 is allowed on `box`, `chips`, and `choice` only. Edges and flow steps may
 target any node; the viewer attaches them to whatever stands for it on screen.
 
+### Routing invariant
+
+A connection to something outside a frame must leave through the nearest clear
+side in a straight segment, then make its bends outside the frame. It must not
+travel along the frame's interior or re-enter it. Frame titles and descriptions
+are protected space: neither connectors nor their labels may cross them. The
+same rule applies to nested frames and animated flow paths.
+
 Kinds: `actor`, `client`, `service`, `process`, `package`, `module`, `class`,
 `function`, `db`, `store`, `queue`, `external`, `group`.
 
