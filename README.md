@@ -19,6 +19,7 @@ Personal TypeScript and Rust conventions and reusable instructions for AI coding
 | [rust/skills/rust-development/](rust/skills/rust-development/) | Rust skill with ownership and refactoring references |
 | [skills/atlas/](skills/atlas/) | Language-agnostic skill that maps a system into a nested drill-down HTML canvas |
 | [skills/ui-teardown/](skills/ui-teardown/) | Skill that reverse engineers a UI into flows, principles, states, and design tokens |
+| [skills/restructure/](skills/restructure/) | Skill that reformats long AI replies into scannable Markdown without losing detail, with evals |
 | [scripts/install.ts](scripts/install.ts) | Bun installer with previews, profile selection, and conflict checks |
 
 ## Install in a project
