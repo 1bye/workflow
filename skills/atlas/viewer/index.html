@@ -310,7 +310,7 @@ function compactGraph(graph, boxes, drawn) {
 }
 
 // shortcut: try short orthogonal routes; a full router is only needed to compact maze-like frames.
-function compactRoute(d, boxes) {
+function compactRoute(d, boxes, traffic = []) {
   const a = boxes.get(d.s), b = boxes.get(d.t);
   const all = [...boxes.values()];
   const ancestors = (n) => all.filter((f) => f.frame && f.id !== n.id && has(f.p, n.p));
@@ -335,6 +335,42 @@ function compactRoute(d, boxes) {
   };
   const xs = [...new Set(obstacles.flatMap((n) => [n.x - 24, n.x + n.w + 24]))];
   const ys = [...new Set(obstacles.flatMap((n) => [n.y - 24, n.y + n.h + 24]))];
+  const lateral = (e) => all.some((f) => {
+    if (!f.frame) return false;
+    const a = boxes.get(e.s), b = boxes.get(e.t);
+    if (has(f.p, a.p) === has(f.p, b.p)) return false;
+    const outside = has(f.p, a.p) ? b : a;
+    return outside.y < f.y + f.h && outside.y + outside.h > f.y
+      && (outside.x + outside.w <= f.x || outside.x >= f.x + f.w);
+  });
+  const sideLoad = (n, other, port) => lateral(d) ? 0 : ancestors(n).filter((f) => !has(f.p, other.p)).reduce((load, f) => {
+    const side = port.x === n.x ? -1 : port.x === n.x + n.w ? 1 : 0;
+    if (!side) return load;
+    return load + traffic.filter((e) => {
+      if ((e.s === d.s && e.t === d.t) || (e.s === d.t && e.t === d.s)) return false;
+      const a = boxes.get(e.s), b = boxes.get(e.t);
+      if (has(f.p, a.p) === has(f.p, b.p)) return false;
+      const outside = has(f.p, a.p) ? b : a;
+      return outside.y < f.y + f.h && outside.y + outside.h > f.y
+        && (side < 0 ? outside.x + outside.w <= f.x : outside.x >= f.x + f.w);
+    }).length;
+  }, 0);
+  const crossings = (pts) => {
+    let count = 0;
+    for (const e of traffic) {
+      // Keep lateral trunks stable; the links above and below the frame yield to them.
+      if (lateral(d) && !lateral(e)) continue;
+      if (!e.pts || e.s === d.s || e.s === d.t || e.t === d.s || e.t === d.t) continue;
+      for (let i = 1; i < pts.length; i++) for (let j = 1; j < e.pts.length; j++) {
+        const p = pts[i - 1], q = pts[i], a = e.pts[j - 1], b = e.pts[j];
+        if (p.x === q.x && a.y === b.y && p.x > Math.min(a.x, b.x) && p.x < Math.max(a.x, b.x)
+          && a.y > Math.min(p.y, q.y) && a.y < Math.max(p.y, q.y)) count++;
+        if (p.y === q.y && a.x === b.x && a.x > Math.min(p.x, q.x) && a.x < Math.max(p.x, q.x)
+          && p.y > Math.min(a.y, b.y) && p.y < Math.max(a.y, b.y)) count++;
+      }
+    }
+    return count;
+  };
   const labelFor = (pts) => {
     if (!d.text || d.hideLabel) return false;
     const w = d.text.length * 6.8 + 10, h = 16;
@@ -360,7 +396,8 @@ function compactRoute(d, boxes) {
       if (route.some((p) => p.x < 8 || p.y < 8) || !route.slice(1).every((p, i) => clear(route[i], p))) continue;
       const pts = [start, ...route, end].filter((p, i, all) => !i || p.x !== all[i - 1].x || p.y !== all[i - 1].y);
       for (let i = pts.length - 2; i > 0; i--) if ((pts[i - 1].x === pts[i].x && pts[i].x === pts[i + 1].x) || (pts[i - 1].y === pts[i].y && pts[i].y === pts[i + 1].y)) pts.splice(i, 1);
-      const cost = pts.slice(1).reduce((sum, p, i) => sum + Math.abs(p.x - pts[i].x) + Math.abs(p.y - pts[i].y), pts.length * 24);
+      const congestion = sideLoad(a, b, start) + sideLoad(b, a, end) + crossings(pts);
+      const cost = pts.slice(1).reduce((sum, p, i) => sum + Math.abs(p.x - pts[i].x) + Math.abs(p.y - pts[i].y), pts.length * 24 + congestion * 1000);
       if (cost >= bestCost) continue;
       const label = labelFor(pts);
       if (label === null) continue;
@@ -398,15 +435,19 @@ function readLayout(g, boxes, drawn, deferred = new Set()) {
     }
   })(g, 0, 0);
   const routed = new Map(g.edges.map((e) => [e.id, e]));
-  const edges = drawn.map((d, i) => {
-    const a = placed.get(d.s), b = placed.get(d.t);
-    if (deferred.has("e" + i) || [...placed.values()].some((f) => f.frame && (has(f.p, a.p) || has(f.p, b.p)))) return compactRoute(d, placed);
+  const traffic = drawn.map((d, i) => {
+    if (deferred.has("e" + i)) return { ...d, pts: null, label: false };
     const e = routed.get("e" + i), s = e.sections?.[0], o = origin.get(e.container) || origin.get("root");
     const shift = (p) => ({ x: p.x + o.x, y: p.y + o.y });
     const l = e.labels?.[0], labelW = d.text.length * 6.8 + 10;
     const pts = s ? [s.startPoint, ...(s.bendPoints || []), s.endPoint].map(shift) : null;
     const label = l && !d.hideLabel && { ...l, ...shift(l), x: l.x + o.x + (l.width - labelW) / 2, width: labelW };
     return { ...d, pts, label: inlineLabel(pts, label) };
+  });
+  const edges = traffic.map((d, i) => {
+    const a = placed.get(d.s), b = placed.get(d.t);
+    if (deferred.has("e" + i) || [...placed.values()].some((f) => f.frame && (has(f.p, a.p) || has(f.p, b.p)))) return compactRoute(d, placed, traffic);
+    return d;
   });
   if (edges.some((e) => !e)) return null;
   let w = g.width, h = g.height;
@@ -923,7 +964,7 @@ function showStep() {
   for (const g of world.querySelectorAll(".edge")) g.classList.add("dim");
   if (!ba || !bb || a === b) return;
   const route = L.edges.find((e) => (e.s === ba.id && e.t === bb.id) || (e.s === bb.id && e.t === ba.id))
-    || compactRoute({ s: ba.id, t: bb.id, text: s.label || "" }, L.boxes);
+    || compactRoute({ s: ba.id, t: bb.id, text: s.label || "" }, L.boxes, L.edges);
   if (!route) return;
   const p0 = edgePoint(ba, center(bb)), p1 = edgePoint(bb, center(ba));
   const mx = (p0.x + p1.x) / 2, my = (p0.y + p1.y) / 2, dx = p1.x - p0.x, dy = p1.y - p0.y;

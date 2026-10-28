@@ -143,7 +143,7 @@ function compactHelpers() {
   return { context, ...runInContext("({ compactGraph, compactRoute, layoutCost, readLayout, bundleEdges, inlineLabel })", context) } as {
     context: ReturnType<typeof createContext>;
     compactGraph: (graph: object, boxes: Map<string, object>, drawn: object[]) => { graph: { children: { id: string; children?: { id: string }[] }[]; edges: { id: string }[] }; deferred: Set<string> };
-    compactRoute: (edge: { s: string; t: string; text: string }, boxes: Map<string, Box>) => Route | null;
+    compactRoute: (edge: { s: string; t: string; text: string }, boxes: Map<string, Box>, traffic?: BundleEdge[]) => Route | null;
     layoutCost: (layout: { w: number; h: number }) => number;
     readLayout: (graph: object, boxes: Map<string, Box>, drawn: object[], deferred: Set<string>) => object | null;
     bundleEdges: (layout: { boxes: Map<string, Box>; edges: BundleEdge[] }) => Connector[];
@@ -387,6 +387,61 @@ test("nested frame exits stay straight through every ancestor boundary", () => {
   }
 });
 
+test("links above and below a frame avoid the side used by its lateral trunk", () => {
+  const { compactRoute, readLayout, bundleEdges } = compactHelpers();
+
+  for (const mirrored of [false, true]) {
+    const boxes = new Map<string, Box>([
+      ["server", { id: "server", p: "server", x: 100, y: 220, w: 320, h: 480, frame: true }],
+      ["server.input", { id: "server.input", p: "server.input", x: 124, y: 320, w: 272, h: 120 }],
+      ["server.worker", { id: "server.worker", p: "server.worker", x: 124, y: 540, w: 272, h: 120 }],
+      ["screen", { id: "screen", p: "screen", x: 168, y: 32, w: 240, h: 100 }],
+      ["storage", { id: "storage", p: "storage", x: 240, y: 820, w: 80, h: 96 }],
+      ...[350, 500, 650].map((y, i): [string, Box] => ["worker" + i, { id: "worker" + i, p: "worker", x: 750, y, w: 160, h: 80 }]),
+    ]);
+
+    const trunk = { s: "server.worker", t: "worker", fwd: true, back: false };
+
+    const traffic: BundleEdge[] = [
+      { s: "screen", t: "server.input", text: "commands · events", m: { s: "screen", t: "server.input", fwd: true, back: true },
+        pts: [{ x: 288, y: 132 }, { x: 288, y: 156 }, { x: 444, y: 156 }, { x: 444, y: 380 }, { x: 396, y: 380 }] },
+      { s: "server.input", t: "storage", text: "records", m: { s: "server.input", t: "storage", fwd: true, back: true },
+        pts: [{ x: 396, y: 380 }, { x: 444, y: 380 }, { x: 444, y: 868 }, { x: 320, y: 868 }] },
+      ...[390, 540, 690].map((y, i) => ({ s: "server.worker", t: "worker" + i, text: "worker protocol", m: trunk,
+        pts: [{ x: 396, y: 600 }, { x: 700, y: 600 }, { x: 700, y }, { x: 750, y }] })),
+    ];
+
+    if (mirrored) {
+      for (const b of boxes.values()) b.x = 1100 - b.x - b.w;
+
+      for (const edge of traffic) for (const p of edge.pts!) p.x = 1100 - p.x;
+    }
+
+    const api = boxes.get("server.input")!;
+    const exit = mirrored ? api.x + api.w : api.x;
+    const ui = compactRoute(traffic[0]!, boxes, traffic)!;
+    const db = compactRoute(traffic[1]!, boxes, traffic)!;
+    const worker = compactRoute(traffic[2]!, boxes, traffic)!;
+
+    expect(ui.pts.at(-1)!.x).toBe(exit);
+    expect(db.pts[0]!.x).toBe(exit);
+    expect(worker.pts[0]!.x).toBe(mirrored ? 704 : 396);
+    expect(worker.pts[1]!.y).toBe(600);
+
+    if (!mirrored) {
+      const graph = { width: 1200, height: 1000, children: [], edges: traffic.map((e, i) => ({ id: "e" + i,
+        sections: [{ startPoint: e.pts![0], bendPoints: e.pts!.slice(1, -1), endPoint: e.pts!.at(-1) }],
+      })) };
+
+      const result = readLayout(graph, boxes, traffic, new Set()) as { boxes: Map<string, Box>; edges: BundleEdge[] };
+
+      expect(result.edges[0]!.pts!.at(-1)!.x).toBe(api.x);
+      expect(result.edges[1]!.pts![0]!.x).toBe(api.x);
+      expect(bundleEdges(result).find((c) => c.m === trunk)!.strokes).toHaveLength(4);
+    }
+  }
+});
+
 test("flow-only links use the frame router instead of drawing an unsafe fallback curve", () => {
   const attempts: object[] = [];
 
@@ -406,6 +461,29 @@ test("flow-only links use the frame router instead of drawing an unsafe fallback
   runInContext(viewer.slice(viewer.indexOf("function showStep("), viewer.indexOf("function edgePoint(")), context);
   runInContext("showStep()", context);
   expect(attempts).toEqual([{ s: "server.input", t: "storage", text: "records" }]);
+});
+
+test("routing prefers a detour over crossing an unrelated connection", () => {
+  const { compactRoute } = compactHelpers();
+
+  const boxes = new Map<string, Box>([
+    ["a", { id: "a", p: "a", x: 100, y: 200, w: 100, h: 60 }],
+    ["b", { id: "b", p: "b", x: 500, y: 200, w: 100, h: 60 }],
+    ["c", { id: "c", p: "c", x: 300, y: 100, w: 80, h: 60 }],
+    ["d", { id: "d", p: "d", x: 300, y: 300, w: 80, h: 60 }],
+  ]);
+
+  const traffic = [{ s: "c", t: "d", text: "", m: { s: "c", t: "d", fwd: true, back: false }, pts: [{ x: 340, y: 160 }, { x: 340, y: 300 }] }];
+  const edge = { s: "a", t: "b", text: "messages" };
+  const route = compactRoute(edge, boxes, traffic)!;
+
+  expect(compactRoute(edge, boxes)!.pts).toEqual([{ x: 200, y: 230 }, { x: 500, y: 230 }]);
+
+  for (let i = 1; i < route.pts.length; i++) {
+    const a = route.pts[i - 1]!, b = route.pts[i]!;
+
+    if (a.y === b.y && Math.min(a.x, b.x) < 340 && Math.max(a.x, b.x) > 340) expect(a.y <= 160 || a.y >= 300).toBe(true);
+  }
 });
 
 test("the grid fallback keeps frames as closed cards so no connection loses an endpoint", async () => {

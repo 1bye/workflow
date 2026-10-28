@@ -69,6 +69,9 @@ side in a straight segment, then make its bends outside the frame. It must not
 travel along the frame's interior or re-enter it. Frame titles and descriptions
 are protected space: neither connectors nor their labels may cross them. The
 same rule applies to nested frames and animated flow paths.
+Among valid exits, account for other connections before minimizing route length.
+Links above or below a frame should use its less congested side, keeping lateral
+trunks clear rather than crossing them or forcing them onto a different side.
 
 Kinds: `actor`, `client`, `service`, `process`, `package`, `module`, `class`,
 `function`, `db`, `store`, `queue`, `external`, `group`.
