@@ -20,7 +20,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 import { WorkflowInstaller } from "./install";
 import { profiles } from "./profiles";
 
@@ -163,6 +163,32 @@ test("repeat installation is a no-op and omitted options retain selections", () 
   expect(
     readFileSync(join(options.target, "AGENTS.md"), "utf8").match(/workflow:begin/g),
   ).toHaveLength(1);
+});
+
+test("component-lab installs its source and lockfile without dependencies or build output", () => {
+  const options = fixture();
+  const skill = "skills/component-lab";
+
+  cpSync(join(repository, skill), join(options.source, skill), {
+    recursive: true,
+    filter: (path) => !path.split(sep).some((part) => ["node_modules", "dist", ".vite"].includes(part)),
+  });
+  const expected = snapshot(join(options.source, skill));
+
+  for (const name of ["node_modules", "dist", ".vite"]) {
+    mkdirSync(join(options.source, skill, name));
+    writeFileSync(join(options.source, skill, name, "generated.js"), "Generated locally.");
+  }
+
+  WorkflowInstaller.apply(
+    WorkflowInstaller.plan({ ...options, profiles: ["core"], skills: ["component-lab"] }),
+  );
+
+  expect(snapshot(join(options.target, ".agents/skills/component-lab"))).toEqual(
+    expected,
+  );
+  checkLinks(options.target);
+  expect(WorkflowInstaller.plan(options).changes.every((change) => change.status === "unchanged")).toBe(true);
 });
 
 test("updates unchanged managed copies and preserves edits outside the AGENTS block", () => {

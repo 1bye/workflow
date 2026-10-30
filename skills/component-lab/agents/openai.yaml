@@ -1,0 +1,3 @@
+interface:
+  display_name: "Component Lab"
+  short_description: "Preview and tweak draft UI components locally"

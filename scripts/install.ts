@@ -342,8 +342,11 @@ export class WorkflowInstaller {
         throw new Error(`Source symlink requires manual handling: ${path}`);
 
       if (stat.isDirectory()) {
-        for (const child of readdirSync(resolve(source, path)).sort())
+        for (const child of readdirSync(resolve(source, path)).sort()) {
+          if (["node_modules", "dist", ".vite"].includes(child)) continue;
+
           copySkill(`${path}/${child}`, `${destination}/${child}`);
+        }
       } else {
         const content = WorkflowInstaller.read(source, path);
 

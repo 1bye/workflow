@@ -19,6 +19,7 @@ Personal TypeScript and Rust conventions and reusable instructions for AI coding
 | [rust/skills/rust-development/](rust/skills/rust-development/) | Rust skill with ownership and refactoring references |
 | [skills/atlas/](skills/atlas/) | Language-agnostic skill that maps a system into a nested drill-down HTML canvas |
 | [skills/ui-teardown/](skills/ui-teardown/) | Skill that reverse engineers a UI into flows, principles, states, and design tokens |
+| [skills/component-lab/](skills/component-lab/SKILL.md) | Vite, React, and Tailwind component workbench with resizable panels, live tweaks, and five pin states |
 | [skills/restructure/](skills/restructure/) | Skill that reformats long AI replies into scannable Markdown without losing detail, with evals |
 | [scripts/install.ts](scripts/install.ts) | Bun installer with previews, profile selection, and conflict checks |
 
@@ -63,7 +64,7 @@ bun run scripts/install.ts ../my-app --oxlint --dry-run
 
 Use `--skills` for additional skills: `bro`, `unslop`, `tdd`, `ultracite`,
 `turborepo`, `vercel-react-best-practices`, `vercel-composition-patterns`, `shadcn`,
-or `rust-development`.
+`component-lab`, or `rust-development`.
 Comma-separated and repeated `--profile`/`--skills` flags are supported.
 An explicit flag replaces that selection; omitted flags retain the last install.
 `--skills none` clears extra skills while retaining profile defaults.
@@ -80,7 +81,8 @@ For selected TypeScript profiles, the installer copies the baseline, React and
 testing guides, selected stack sections, and config references into `.agents/workflow/`.
 Rust guides and config references go into `.agents/workflow/rust/`. Rust-only installs
 omit the TypeScript guides and tools. Mixed installs include both sets, with language
-routing in the instruction block. Skills are copied in full into `.agents/skills/`.
+routing in the instruction block. Skill source and resources are copied into
+`.agents/skills/`, excluding `node_modules`, `dist`, and `.vite` directories.
 A marked block in root `AGENTS.md` directs agents
 to the guides; existing project instructions outside that block are preserved.
 Relative links are adjusted for the installed layout. Unselected skill references
