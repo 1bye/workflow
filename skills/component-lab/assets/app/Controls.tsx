@@ -28,7 +28,9 @@ export default function Controls({ component, values, onChange }: Props) {
             control.type === "spacing" ||
             control.type === "easing" ||
             control.type === "gradient" ||
-            control.type === "shadow"
+            control.type === "shadow" ||
+            control.type === "corners" ||
+            control.type === "typography"
           )
             return (
               <CompoundControl

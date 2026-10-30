@@ -30,6 +30,37 @@ export function Heading({
   );
 }
 
+export function LinkButton({
+  label,
+  linked,
+  onClick,
+}: {
+  label: string;
+  linked: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      aria-pressed={linked}
+      className="grid size-5 place-items-center rounded border-0 text-(--lab-faint) hover:bg-(--lab-surface) aria-pressed:bg-(--lab-active) aria-pressed:text-(--lab-text)"
+      onClick={onClick}
+    >
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 16 16"
+        className="size-3"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.2"
+      >
+        <path d="M6 10l4-4M6.5 5l1.8-1.8a3 3 0 014.2 4.2L11 9M5 7L3.5 8.5a3 3 0 004.2 4.2L9.5 11" />
+      </svg>
+    </button>
+  );
+}
+
 export function NumberField({
   label,
   short,

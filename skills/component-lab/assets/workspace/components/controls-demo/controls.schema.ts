@@ -45,6 +45,23 @@ const controls = Schema.Component("Controls demo", {
         inset: false,
       },
     }),
+    typography: Schema.Control.Typography({
+      default: {
+        fontFamily: "system-ui",
+        fontSize: 16,
+        fontWeight: 500,
+        lineHeight: 1.4,
+        letterSpacing: 0,
+      },
+    }),
+    corners: Schema.Control.Corners({
+      default: {
+        topLeft: 12,
+        topRight: 12,
+        bottomRight: 12,
+        bottomLeft: 12,
+      },
+    }),
     position: Schema.Control.Vector2({
       label: "Vector2",
       default: { x: 0, y: 0 },

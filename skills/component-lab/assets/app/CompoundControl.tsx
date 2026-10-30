@@ -6,6 +6,8 @@ import {
   isVector2,
   isGradient,
   isShadow,
+  isCorners,
+  isTypography,
   type Value,
 } from "../schema/values";
 import Vector2Editor from "./controls/Vector2Control";
@@ -14,6 +16,8 @@ import SpacingEditor from "./controls/SpacingControl";
 import EasingEditor from "./controls/EasingControl";
 import GradientEditor from "./controls/GradientControl";
 import ShadowEditor from "./controls/ShadowControl";
+import CornersEditor from "./controls/CornersControl";
+import TypographyEditor from "./controls/TypographyControl";
 
 export default function CompoundControlEditor({
   control,
@@ -65,6 +69,20 @@ export default function CompoundControlEditor({
           control={control}
           label={label}
           value={isShadow(value) ? value : control.default}
+          onChange={onChange}
+        />
+      ) : control.type === "corners" ? (
+        <CornersEditor
+          control={control}
+          label={label}
+          value={isCorners(value) ? value : control.default}
+          onChange={onChange}
+        />
+      ) : control.type === "typography" ? (
+        <TypographyEditor
+          control={control}
+          label={label}
+          value={isTypography(value) ? value : control.default}
           onChange={onChange}
         />
       ) : (

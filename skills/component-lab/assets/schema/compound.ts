@@ -6,6 +6,8 @@ import {
   isVector2,
   isGradient,
   isShadow,
+  isCorners,
+  isTypography,
   type Easing,
   type Interval,
   type Spacing,
@@ -13,6 +15,8 @@ import {
   type Vector2,
   type Gradient,
   type Shadow,
+  type Corners,
+  type Typography,
 } from "./values";
 
 type Bounds = { min: number; max: number; step: number; unit: string };
@@ -23,13 +27,21 @@ export type SpacingControl = Presentation & Bounds & { type: "spacing"; default:
 export type EasingControl = Presentation & { type: "easing"; default: Easing };
 export type GradientControl = Presentation & { type: "gradient"; default: Gradient };
 export type ShadowControl = Presentation & { type: "shadow"; default: Shadow };
+export type CornersControl = Presentation & Bounds & { type: "corners"; default: Corners };
+export type TypographyControl = Presentation & {
+  type: "typography";
+  default: Typography;
+  fonts: readonly string[];
+};
 export type CompoundControl =
   | Vector2Control
   | IntervalControl
   | SpacingControl
   | EasingControl
   | GradientControl
-  | ShadowControl;
+  | ShadowControl
+  | CornersControl
+  | TypographyControl;
 
 export const shadowBounds = {
   x: { min: -100, max: 100 },
@@ -37,6 +49,13 @@ export const shadowBounds = {
   blur: { min: 0, max: 200 },
   spread: { min: -100, max: 100 },
   opacity: { min: 0, max: 1 },
+};
+
+export const typographyBounds = {
+  fontSize: { min: 1, max: 256 },
+  fontWeight: { min: 1, max: 1000 },
+  lineHeight: { min: 0.5, max: 4 },
+  letterSpacing: { min: -10, max: 30 },
 };
 
 function bounds(options: Partial<Bounds>, min: number, max: number): Bounds {
@@ -90,6 +109,48 @@ export const Compound = {
 
     return { ...options, ...range, type: "spacing" };
   },
+  Corners(
+    options: Presentation & { default: Corners; max?: number; step?: number },
+  ): CornersControl {
+    const range = bounds({ ...options, min: 0, unit: "px" }, 0, 64);
+
+    if (!isCorners(options.default) || !within(Object.values(options.default), range))
+      throw new Error("Corners defaults need four finite, non-negative radii within bounds.");
+
+    return { ...options, ...range, type: "corners" };
+  },
+  Typography(
+    options: Presentation & { default: Typography; fonts?: readonly string[] },
+  ): TypographyControl {
+    const value = options.default;
+
+    if (
+      !isTypography(value) ||
+      Object.entries(typographyBounds).some(([key, range]) => {
+        const n = value[key as keyof typeof typographyBounds];
+
+        return n < range.min || n > range.max;
+      })
+    )
+      throw new Error(
+        "Typography defaults need a font family and finite numeric values within bounds.",
+      );
+
+    const fonts = options.fonts ?? [
+      ...new Set([value.fontFamily, "system-ui", "serif", "monospace"]),
+    ];
+
+    if (
+      !fonts.includes(value.fontFamily) ||
+      new Set(fonts).size !== fonts.length ||
+      fonts.some((font) => typeof font !== "string" || !font.trim() || font.length > 120)
+    )
+      throw new Error(
+        "Typography fonts must be unique, non-empty names and include the default family.",
+      );
+
+    return { ...options, fonts, type: "typography" };
+  },
   Easing(options: Presentation & { default: Easing }): EasingControl {
     if (
       !isEasing(options.default) ||
@@ -141,6 +202,23 @@ export const Compound = {
 };
 
 export function parseCompound(control: CompoundControl, value: unknown): Value {
+  if (control.type === "typography") {
+    const source = isTypography(value) ? value : control.default;
+
+    return {
+      ...source,
+      fontFamily: control.fonts.includes(source.fontFamily)
+        ? source.fontFamily
+        : control.default.fontFamily,
+      ...Object.fromEntries(
+        Object.entries(typographyBounds).map(([key, range]) => [
+          key,
+          Math.max(range.min, Math.min(range.max, source[key as keyof typeof typographyBounds])),
+        ]),
+      ),
+    };
+  }
+
   if (control.type === "gradient") {
     const source = isGradient(value) ? value : control.default;
 
@@ -186,6 +264,15 @@ export function parseCompound(control: CompoundControl, value: unknown): Value {
             right: clamp(value.right),
             bottom: clamp(value.bottom),
             left: clamp(value.left),
+          }
+        : { ...control.default };
+    case "corners":
+      return isCorners(value)
+        ? {
+            topLeft: clamp(value.topLeft),
+            topRight: clamp(value.topRight),
+            bottomRight: clamp(value.bottomRight),
+            bottomLeft: clamp(value.bottomLeft),
           }
         : { ...control.default };
     case "interval":

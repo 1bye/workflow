@@ -32,6 +32,18 @@ const schema = Schema.Component("Typed example", {
         inset: false,
       },
     }),
+    typography: Schema.Control.Typography({
+      default: {
+        fontFamily: "system-ui",
+        fontSize: 16,
+        fontWeight: 500,
+        lineHeight: 1.4,
+        letterSpacing: 0,
+      },
+    }),
+    corners: Schema.Control.Corners({
+      default: { topLeft: 8, topRight: 8, bottomRight: 8, bottomLeft: 8 },
+    }),
   },
   states: { expanded: { props: { open: true, variant: "bright" } } },
 });
@@ -54,6 +66,8 @@ export type InferredProps = Assert<
       easing: Schema.Easing;
       gradient: Schema.Gradient;
       shadow: Schema.Shadow;
+      typography: Schema.Typography;
+      corners: Schema.Corners;
     }
   >
 >;
@@ -96,5 +110,17 @@ export function rejectedExamples() {
   Schema.Control.Shadow({
     // @ts-expect-error Shadow values require an inset boolean.
     default: { x: 0, y: 4, blur: 12, spread: 0, color: "#000000", opacity: 0.2 },
+  });
+  // @ts-expect-error Corners requires all four named radii.
+  Schema.Control.Corners({ default: { topLeft: 8, topRight: 8 } });
+  Schema.Control.Typography({
+    default: {
+      fontFamily: "system-ui",
+      fontSize: 16,
+      // @ts-expect-error Typography weights must be numeric.
+      fontWeight: "bold",
+      lineHeight: 1.4,
+      letterSpacing: 0,
+    },
   });
 }

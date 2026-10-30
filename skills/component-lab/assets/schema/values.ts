@@ -1,6 +1,19 @@
 export type Vector2 = { x: number; y: number };
 export type Interval = [min: number, max: number];
 export type Spacing = { top: number; right: number; bottom: number; left: number };
+export type Corners = {
+  topLeft: number;
+  topRight: number;
+  bottomRight: number;
+  bottomLeft: number;
+};
+export type Typography = {
+  fontFamily: string;
+  fontSize: number;
+  fontWeight: number;
+  lineHeight: number;
+  letterSpacing: number;
+};
 export type Easing = [x1: number, y1: number, x2: number, y2: number];
 export type GradientStop = { color: string; position: number };
 export type Gradient = { angle: number; stops: GradientStop[] };
@@ -22,7 +35,9 @@ export type Value =
   | Spacing
   | Easing
   | Gradient
-  | Shadow;
+  | Shadow
+  | Corners
+  | Typography;
 export type Values = Record<string, Value>;
 export const MAX_GRADIENT_STOPS = 8;
 
@@ -52,6 +67,17 @@ function numericObject<K extends string>(
 export const isVector2 = (value: unknown): value is Vector2 => numericObject(value, ["x", "y"]);
 export const isSpacing = (value: unknown): value is Spacing =>
   numericObject(value, ["top", "right", "bottom", "left"]);
+export const isCorners = (value: unknown): value is Corners =>
+  numericObject(value, ["topLeft", "topRight", "bottomRight", "bottomLeft"]);
+export function isTypography(value: unknown): value is Typography {
+  return (
+    hasKeys(value, ["fontFamily", "fontSize", "fontWeight", "lineHeight", "letterSpacing"]) &&
+    typeof value.fontFamily === "string" &&
+    value.fontFamily.trim().length > 0 &&
+    value.fontFamily.length <= 120 &&
+    ["fontSize", "fontWeight", "lineHeight", "letterSpacing"].every((key) => finite(value[key]))
+  );
+}
 export const isInterval = (value: unknown): value is Interval =>
   Array.isArray(value) &&
   value.length === 2 &&
@@ -94,7 +120,9 @@ export function isValue(value: unknown): value is Value {
     isInterval(value) ||
     isEasing(value) ||
     isGradient(value) ||
-    isShadow(value)
+    isShadow(value) ||
+    isCorners(value) ||
+    isTypography(value)
   );
 }
 

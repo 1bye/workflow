@@ -12,8 +12,10 @@ export type {
   GradientStop,
   Gradient,
   Shadow,
+  Corners,
+  Typography,
 } from "./values";
-export { gradientCSS, shadowCSS } from "./styles";
+export { gradientCSS, shadowCSS, cornersCSS } from "./styles";
 export type Presentation = { label?: string; hidden?: boolean };
 export type NumberControl = Presentation & {
   type: "number";
@@ -137,6 +139,8 @@ function parseControl(control: AnyControl, value: unknown): Value {
     case "easing":
     case "gradient":
     case "shadow":
+    case "corners":
+    case "typography":
       return parseCompound(control, value);
   }
 }

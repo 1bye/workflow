@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { SpacingControl } from "../../schema/compound";
-import { NumberField, type EditorProps } from "./shared";
+import { LinkButton, NumberField, type EditorProps } from "./shared";
 
 export default function SpacingControlEditor({
   label,
@@ -18,29 +18,16 @@ export default function SpacingControlEditor({
         </span>
         <div className="mt-1 flex items-center gap-1 text-[9px] text-(--lab-faint)">
           {control.unit}
-          <button
-            type="button"
-            aria-label={`${linked ? "Unlink" : "Link"} ${label.toLowerCase()} sides`}
-            aria-pressed={linked}
-            className="grid size-5 place-items-center rounded border-0 text-(--lab-faint) hover:bg-(--lab-surface) aria-pressed:bg-(--lab-active) aria-pressed:text-(--lab-text)"
+          <LinkButton
+            label={`${linked ? "Unlink" : "Link"} ${label.toLowerCase()} sides`}
+            linked={linked}
             onClick={() => {
               setLinked(!linked);
 
               if (!linked)
                 onChange({ top: value.top, right: value.top, bottom: value.top, left: value.top });
             }}
-          >
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 16 16"
-              className="size-3"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.2"
-            >
-              <path d="M6 10l4-4M6.5 5l1.8-1.8a3 3 0 014.2 4.2L11 9M5 7L3.5 8.5a3 3 0 004.2 4.2L9.5 11" />
-            </svg>
-          </button>
+          />
         </div>
       </div>
       <div data-spacing-values className="grid grid-cols-2 gap-1">

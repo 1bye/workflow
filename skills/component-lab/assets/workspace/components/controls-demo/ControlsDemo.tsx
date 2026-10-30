@@ -1,5 +1,5 @@
 import type { ControlsProps } from "./controls.schema";
-import { gradientCSS, shadowCSS } from "@local";
+import { gradientCSS, shadowCSS, cornersCSS } from "@local";
 
 export default function ControlsDemo({
   fontSize,
@@ -14,6 +14,8 @@ export default function ControlsDemo({
   easing,
   gradient,
   shadow,
+  typography,
+  corners,
 }: ControlsProps) {
   return (
     <div className="flex min-h-[180px] w-full min-w-0 flex-col items-center justify-center gap-5 px-3 py-6">
@@ -26,6 +28,7 @@ export default function ControlsDemo({
           className="inline-flex items-center justify-center gap-2.5 rounded-xl border border-solid leading-snug shadow-sm transition-transform duration-700 hover:-translate-y-1.5 motion-reduce:transition-none"
           style={{
             fontSize,
+            borderRadius: cornersCSS(corners),
             minWidth: `min(${width[0]}px, 100%)`,
             maxWidth: `min(${width[1]}px, 100%)`,
             padding: `${padding.top}px ${padding.right}px ${padding.bottom}px ${padding.left}px`,
@@ -50,11 +53,20 @@ export default function ControlsDemo({
       </p>
       <div
         role="img"
-        aria-label="Gradient and shadow preview"
-        className="flex h-12 w-full max-w-[224px] items-center justify-center rounded-xl text-[11px] font-medium text-white"
-        style={{ backgroundImage: gradientCSS(gradient), boxShadow: shadowCSS(shadow) }}
+        aria-label="Surface preview"
+        className="flex min-h-12 w-full max-w-[224px] items-center justify-center px-3 py-2 text-center text-white wrap-anywhere"
+        style={{
+          ...typography,
+          borderRadius: cornersCSS(corners),
+          backgroundImage: gradientCSS(gradient),
+          boxShadow: shadowCSS(shadow),
+        }}
       >
-        <span aria-hidden="true">Surface preview</span>
+        <span aria-hidden="true">
+          Surface preview
+          <br />
+          Aa Bb Cc 0123
+        </span>
       </div>
     </div>
   );
