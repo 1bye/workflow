@@ -39,9 +39,13 @@ export default function EasingControlEditor({
     return () => observer.disconnect();
   }, []);
 
-  const [drag, setDrag] = useState<{ index: 0 | 2; min: number; max: number } | null>(null);
-  const min = drag?.min ?? Math.min(-0.25, Math.floor(Math.min(value[1], value[3]) * 4) / 4 - 0.25);
-  const max = drag?.max ?? Math.max(1.25, Math.ceil(Math.max(value[1], value[3]) * 4) / 4 + 0.25);
+  // Fit once on open so editing or releasing a handle never moves the axes.
+  const [{ min, max }] = useState(() => ({
+    min: Math.min(-0.25, Math.floor(Math.min(value[1], value[3]) * 4) / 4 - 0.25),
+    max: Math.max(1.25, Math.ceil(Math.max(value[1], value[3]) * 4) / 4 + 0.25),
+  }));
+
+  const [drag, setDrag] = useState<0 | 2 | null>(null);
   // Match SVG units to CSS pixels so resizing the pad keeps handles, strokes, and grid spacing crisp.
   const span = size - 16;
   const x = (n: number) => 8 + n * span;
@@ -97,12 +101,12 @@ export default function EasingControlEditor({
           const index = distance(0) <= distance(2) ? 0 : 2;
 
           event.currentTarget.setPointerCapture(event.pointerId);
-          setDrag({ index, min, max });
+          setDrag(index);
           update(event, index);
         }}
         onPointerMove={(event) => {
-          if (drag && event.currentTarget.hasPointerCapture(event.pointerId))
-            update(event, drag.index);
+          if (drag !== null && event.currentTarget.hasPointerCapture(event.pointerId))
+            update(event, drag);
         }}
         onPointerUp={() => setDrag(null)}
         onLostPointerCapture={() => setDrag(null)}
