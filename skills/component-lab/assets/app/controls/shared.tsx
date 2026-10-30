@@ -77,6 +77,33 @@ export function NumberField({
   );
 }
 
+export function ColorField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="flex min-w-0 items-center gap-1 rounded-[4px] bg-(--lab-surface) px-1.5 py-1">
+      <span
+        className="min-w-0 flex-1 truncate font-mono text-[9px] text-(--lab-faint)"
+        aria-hidden="true"
+      >
+        {value.toUpperCase()}
+      </span>
+      <input
+        type="color"
+        aria-label={label}
+        value={value}
+        onInput={(event) => onChange(event.currentTarget.value)}
+      />
+    </label>
+  );
+}
+
 export const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
 export const snap = (n: number, min: number, max: number, step: number) =>
   clamp(Number((Math.round((n - min) / step) * step + min).toFixed(6)), min, max);

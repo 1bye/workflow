@@ -18,9 +18,7 @@ export function validateSettings(value: unknown): Settings {
 
   for (const [id, props] of Object.entries(value.components)) {
     if (!isComponentId(id) || !isValues(props))
-      throw new Error(
-        "Invalid component settings: expected scalar values, numeric tuples, or coordinate/spacing objects.",
-      );
+      throw new Error("Invalid component settings: expected valid control values.");
 
     components[id] = props;
   }

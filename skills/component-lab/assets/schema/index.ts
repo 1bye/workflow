@@ -2,7 +2,18 @@ import { createElement, type ComponentType, type ReactElement } from "react";
 import { Compound, parseCompound, type CompoundControl } from "./compound";
 import { sameValue, type Value, type Values } from "./values";
 
-export type { Value, Values, Vector2, Interval, Spacing, Easing } from "./values";
+export type {
+  Value,
+  Values,
+  Vector2,
+  Interval,
+  Spacing,
+  Easing,
+  GradientStop,
+  Gradient,
+  Shadow,
+} from "./values";
+export { gradientCSS, shadowCSS } from "./styles";
 export type Presentation = { label?: string; hidden?: boolean };
 export type NumberControl = Presentation & {
   type: "number";
@@ -124,6 +135,8 @@ function parseControl(control: AnyControl, value: unknown): Value {
     case "interval":
     case "spacing":
     case "easing":
+    case "gradient":
+    case "shadow":
       return parseCompound(control, value);
   }
 }

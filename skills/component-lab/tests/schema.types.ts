@@ -12,6 +12,26 @@ const schema = Schema.Component("Typed example", {
     interval: Schema.Control.Interval({ default: [0, 10] }),
     padding: Schema.Control.Spacing({ default: { top: 8, right: 8, bottom: 8, left: 8 } }),
     easing: Schema.Control.Easing({ default: [0.25, 0.1, 0.25, 1] }),
+    gradient: Schema.Control.Gradient({
+      default: {
+        angle: 90,
+        stops: [
+          { color: "#000000", position: 0 },
+          { color: "#ffffff", position: 100 },
+        ],
+      },
+    }),
+    shadow: Schema.Control.Shadow({
+      default: {
+        x: 0,
+        y: 4,
+        blur: 12,
+        spread: 0,
+        color: "#000000",
+        opacity: 0.2,
+        inset: false,
+      },
+    }),
   },
   states: { expanded: { props: { open: true, variant: "bright" } } },
 });
@@ -32,6 +52,8 @@ export type InferredProps = Assert<
       interval: Schema.Interval;
       padding: Schema.Spacing;
       easing: Schema.Easing;
+      gradient: Schema.Gradient;
+      shadow: Schema.Shadow;
     }
   >
 >;
@@ -69,4 +91,10 @@ export function rejectedExamples() {
   Schema.Control.Spacing({ default: { top: 8, right: 8 } });
   // @ts-expect-error Easing requires four numeric handles.
   Schema.Control.Easing({ default: [0, 1] });
+  // @ts-expect-error Gradient stops require a numeric position.
+  Schema.Control.Gradient({ default: { angle: 90, stops: [{ color: "#000000", position: "0" }] } });
+  Schema.Control.Shadow({
+    // @ts-expect-error Shadow values require an inset boolean.
+    default: { x: 0, y: 4, blur: 12, spread: 0, color: "#000000", opacity: 0.2 },
+  });
 }

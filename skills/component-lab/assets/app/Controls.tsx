@@ -26,7 +26,9 @@ export default function Controls({ component, values, onChange }: Props) {
             control.type === "vector2" ||
             control.type === "interval" ||
             control.type === "spacing" ||
-            control.type === "easing"
+            control.type === "easing" ||
+            control.type === "gradient" ||
+            control.type === "shadow"
           )
             return (
               <CompoundControl

@@ -1,9 +1,19 @@
 import type { CompoundControl } from "../schema/compound";
-import { isEasing, isInterval, isSpacing, isVector2, type Value } from "../schema/values";
+import {
+  isEasing,
+  isInterval,
+  isSpacing,
+  isVector2,
+  isGradient,
+  isShadow,
+  type Value,
+} from "../schema/values";
 import Vector2Editor from "./controls/Vector2Control";
 import IntervalEditor from "./controls/IntervalControl";
 import SpacingEditor from "./controls/SpacingControl";
 import EasingEditor from "./controls/EasingControl";
+import GradientEditor from "./controls/GradientControl";
+import ShadowEditor from "./controls/ShadowControl";
 
 export default function CompoundControlEditor({
   control,
@@ -41,6 +51,20 @@ export default function CompoundControlEditor({
           control={control}
           label={label}
           value={isSpacing(value) ? value : control.default}
+          onChange={onChange}
+        />
+      ) : control.type === "gradient" ? (
+        <GradientEditor
+          control={control}
+          label={label}
+          value={isGradient(value) ? value : control.default}
+          onChange={onChange}
+        />
+      ) : control.type === "shadow" ? (
+        <ShadowEditor
+          control={control}
+          label={label}
+          value={isShadow(value) ? value : control.default}
           onChange={onChange}
         />
       ) : (

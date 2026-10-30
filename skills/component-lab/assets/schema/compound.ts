@@ -4,11 +4,15 @@ import {
   isInterval,
   isSpacing,
   isVector2,
+  isGradient,
+  isShadow,
   type Easing,
   type Interval,
   type Spacing,
   type Value,
   type Vector2,
+  type Gradient,
+  type Shadow,
 } from "./values";
 
 type Bounds = { min: number; max: number; step: number; unit: string };
@@ -17,7 +21,23 @@ export type Vector2Control = Presentation & Bounds & { type: "vector2"; default:
 export type IntervalControl = Presentation & Bounds & { type: "interval"; default: Interval };
 export type SpacingControl = Presentation & Bounds & { type: "spacing"; default: Spacing };
 export type EasingControl = Presentation & { type: "easing"; default: Easing };
-export type CompoundControl = Vector2Control | IntervalControl | SpacingControl | EasingControl;
+export type GradientControl = Presentation & { type: "gradient"; default: Gradient };
+export type ShadowControl = Presentation & { type: "shadow"; default: Shadow };
+export type CompoundControl =
+  | Vector2Control
+  | IntervalControl
+  | SpacingControl
+  | EasingControl
+  | GradientControl
+  | ShadowControl;
+
+export const shadowBounds = {
+  x: { min: -100, max: 100 },
+  y: { min: -100, max: 100 },
+  blur: { min: 0, max: 200 },
+  spread: { min: -100, max: 100 },
+  opacity: { min: 0, max: 1 },
+};
 
 function bounds(options: Partial<Bounds>, min: number, max: number): Bounds {
   const result = {
@@ -81,9 +101,74 @@ export const Compound = {
 
     return { ...options, type: "easing" };
   },
+  Gradient(options: Presentation & { default: Gradient }): GradientControl {
+    const value = options.default;
+
+    if (
+      !isGradient(value) ||
+      value.angle < 0 ||
+      value.angle > 360 ||
+      value.stops.some(
+        (stop, index) =>
+          stop.position < 0 ||
+          stop.position > 100 ||
+          (index > 0 && stop.position < value.stops[index - 1]!.position),
+      )
+    )
+      throw new Error(
+        "Gradient defaults need an angle from 0 to 360 and 2–8 ordered hex color stops from 0 to 100.",
+      );
+
+    return { ...options, type: "gradient" };
+  },
+  Shadow(options: Presentation & { default: Shadow }): ShadowControl {
+    const value = options.default;
+
+    if (
+      !isShadow(value) ||
+      Object.entries(shadowBounds).some(([key, range]) => {
+        const n = value[key as keyof typeof shadowBounds];
+
+        return n < range.min || n > range.max;
+      })
+    )
+      throw new Error(
+        "Shadow defaults need finite values within bounds, a hex color, and an inset boolean.",
+      );
+
+    return { ...options, type: "shadow" };
+  },
 };
 
 export function parseCompound(control: CompoundControl, value: unknown): Value {
+  if (control.type === "gradient") {
+    const source = isGradient(value) ? value : control.default;
+
+    return {
+      angle: Math.max(0, Math.min(360, source.angle)),
+      stops: source.stops
+        .map((stop) => ({
+          color: stop.color,
+          position: Math.max(0, Math.min(100, stop.position)),
+        }))
+        .sort((a, b) => a.position - b.position),
+    };
+  }
+
+  if (control.type === "shadow") {
+    const source = isShadow(value) ? value : control.default;
+
+    return {
+      ...source,
+      ...Object.fromEntries(
+        Object.entries(shadowBounds).map(([key, range]) => [
+          key,
+          Math.max(range.min, Math.min(range.max, source[key as keyof typeof shadowBounds])),
+        ]),
+      ),
+    };
+  }
+
   if (control.type === "easing")
     return isEasing(value)
       ? [Math.max(0, Math.min(1, value[0])), value[1], Math.max(0, Math.min(1, value[2])), value[3]]

@@ -1,4 +1,5 @@
 import type { ControlsProps } from "./controls.schema";
+import { gradientCSS, shadowCSS } from "@local";
 
 export default function ControlsDemo({
   fontSize,
@@ -11,6 +12,8 @@ export default function ControlsDemo({
   width,
   padding,
   easing,
+  gradient,
+  shadow,
 }: ControlsProps) {
   return (
     <div className="flex min-h-[180px] w-full min-w-0 flex-col items-center justify-center gap-5 px-3 py-6">
@@ -45,6 +48,14 @@ export default function ControlsDemo({
       <p className="text-center font-mono text-[9px] text-(--lab-faint)">
         {width[0]}–{width[1]}px width · hover for easing
       </p>
+      <div
+        role="img"
+        aria-label="Gradient and shadow preview"
+        className="flex h-12 w-full max-w-[224px] items-center justify-center rounded-xl text-[11px] font-medium text-white"
+        style={{ backgroundImage: gradientCSS(gradient), boxShadow: shadowCSS(shadow) }}
+      >
+        <span aria-hidden="true">Surface preview</span>
+      </div>
     </div>
   );
 }

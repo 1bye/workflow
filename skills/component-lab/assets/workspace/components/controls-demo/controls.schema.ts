@@ -25,6 +25,26 @@ const controls = Schema.Component("Controls demo", {
       label: "Weight",
       default: "medium",
     }),
+    gradient: Schema.Control.Gradient({
+      default: {
+        angle: 135,
+        stops: [
+          { color: "#7c79ba", position: 0 },
+          { color: "#3f80ac", position: 100 },
+        ],
+      },
+    }),
+    shadow: Schema.Control.Shadow({
+      default: {
+        x: 0,
+        y: 8,
+        blur: 24,
+        spread: -4,
+        color: "#000000",
+        opacity: 0.25,
+        inset: false,
+      },
+    }),
     position: Schema.Control.Vector2({
       label: "Vector2",
       default: { x: 0, y: 0 },
