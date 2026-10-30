@@ -1,8 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 
-export default function ResizeHandle({ orientation, value, bounds, onResize }) {
+type Props = {
+  orientation: "vertical" | "horizontal";
+  value: number;
+  bounds: { min: number; max: number };
+  onResize: (value: number) => void;
+};
+
+export default function ResizeHandle({ orientation, value, bounds, onResize }: Props) {
   const vertical = orientation === "vertical";
-  const drag = useRef(null);
+  const drag = useRef<{ start: number; size: number } | null>(null);
   const [dragging, setDragging] = useState(false);
 
   useEffect(() => {
@@ -12,7 +19,10 @@ export default function ResizeHandle({ orientation, value, bounds, onResize }) {
 
     return () => document.body.classList.remove("resizing");
   }, [dragging]);
-  const finish = () => { drag.current = null; setDragging(false); };
+  const finish = () => {
+    drag.current = null;
+    setDragging(false);
+  };
 
   return (
     <div
@@ -25,7 +35,7 @@ export default function ResizeHandle({ orientation, value, bounds, onResize }) {
       aria-valuenow={value}
       aria-valuemin={bounds.min}
       aria-valuemax={bounds.max}
-      className={`relative z-2 touch-none bg-[#f6f6f2] outline-offset-[-2px] after:absolute after:inset-0 after:bg-[#aab99d] after:opacity-0 after:transition-opacity hover:after:opacity-65 focus-visible:after:opacity-65 ${dragging ? "after:opacity-65" : ""} ${vertical ? "cursor-col-resize border-x border-[#e4e5de]" : "cursor-row-resize border-y border-[#e4e5de]"}`}
+      className={`group relative z-2 touch-none border-(--lab-border) bg-(--lab-panel) ${vertical ? "cursor-col-resize border-r" : "cursor-row-resize border-t"}`}
       onPointerDown={(event) => {
         if (event.button !== 0) return;
 
@@ -36,7 +46,10 @@ export default function ResizeHandle({ orientation, value, bounds, onResize }) {
         event.preventDefault();
       }}
       onPointerMove={(event) => {
-        if (drag.current) onResize(drag.current.size + (vertical ? event.clientX : event.clientY) - drag.current.start);
+        if (drag.current)
+          onResize(
+            drag.current.size + (vertical ? event.clientX : event.clientY) - drag.current.start,
+          );
       }}
       onPointerUp={finish}
       onLostPointerCapture={finish}
@@ -48,6 +61,10 @@ export default function ResizeHandle({ orientation, value, bounds, onResize }) {
         event.preventDefault();
         onResize(value + (event.key === keys[0] ? -1 : 1) * (event.shiftKey ? 30 : 10));
       }}
-    ><span className={vertical ? "absolute top-1/2 left-px h-6 border-l-2 border-[#cbd0c1]" : "absolute top-px left-[calc(50%-12px)] w-6 border-t-2 border-[#cbd0c1]"} /></div>
+    >
+      <span
+        className={`pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-(--lab-focus) opacity-0 group-hover:opacity-60 ${vertical ? "h-6 w-0.5" : "h-0.5 w-6"}`}
+      />
+    </div>
   );
 }

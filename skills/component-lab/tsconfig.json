@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "verbatimModuleSyntax": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": ["node", "vite/client"],
+    "paths": {
+      "@local": ["./assets/schema/index.ts"],
+      "@drafts/*": ["./assets/workspace/*"]
+    }
+  },
+  "include": [
+    "assets/**/*.ts",
+    "assets/**/*.tsx",
+    "scripts/**/*.ts",
+    "tests/**/*.ts",
+    "vite.config.ts"
+  ]
+}
