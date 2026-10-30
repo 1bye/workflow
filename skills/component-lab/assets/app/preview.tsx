@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import components from "./components";
-import { isRenderMessage, type RenderMessage } from "./types";
+import { isActionMessage, isRenderMessage, type ActionResult, type RenderMessage } from "./types";
+import { runAction } from "./actions";
 import "./preview.css";
 
 function Preview() {
@@ -9,12 +10,9 @@ function Preview() {
 
   useEffect(() => {
     const receive = (event: MessageEvent<unknown>) => {
-      if (
-        event.origin === location.origin &&
-        event.source === parent &&
-        isRenderMessage(event.data)
-      )
-        setData(event.data);
+      if (event.origin !== location.origin || event.source !== parent) return;
+
+      if (isRenderMessage(event.data)) setData(event.data);
     };
 
     window.addEventListener("message", receive);
@@ -22,6 +20,44 @@ function Preview() {
 
     return () => window.removeEventListener("message", receive);
   }, []);
+
+  useEffect(() => {
+    const receive = async (event: MessageEvent<unknown>) => {
+      if (
+        event.origin !== location.origin ||
+        event.source !== parent ||
+        !isActionMessage(event.data)
+      )
+        return;
+
+      const message = event.data;
+      let error: string | null = null;
+
+      try {
+        const definition = components.find((component) => component.id === data?.id);
+
+        if (!definition || definition.id !== message.id)
+          throw new Error("The preview is not ready.");
+
+        await runAction(
+          definition.controls,
+          message.key,
+          Array.from(document.querySelectorAll<HTMLElement>("[data-component-preview]")),
+        );
+      } catch (caught) {
+        error = caught instanceof Error ? caught.message : String(caught);
+      }
+
+      parent.postMessage(
+        { type: "action-result", requestId: message.requestId, error } satisfies ActionResult,
+        location.origin,
+      );
+    };
+
+    window.addEventListener("message", receive);
+
+    return () => window.removeEventListener("message", receive);
+  }, [data?.id]);
 
   if (!data) return null;
 
@@ -66,7 +102,10 @@ function Preview() {
               </span>
               <h2 className="text-[10px] font-[550] text-(--lab-muted)">{state.name}</h2>
             </header>
-            <div className="flex min-h-[136px] items-center justify-center px-3 py-2 max-[460px]:min-h-[180px]">
+            <div
+              data-component-preview
+              className="flex min-h-[136px] items-center justify-center px-3 py-2 max-[460px]:min-h-[180px]"
+            >
               {definition.render(data.props, state.id)}
             </div>
             <p className="px-2 pt-2 pb-2.5 text-center text-[9px] text-(--lab-faint)">

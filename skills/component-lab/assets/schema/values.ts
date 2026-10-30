@@ -1,3 +1,5 @@
+import { isAssetSource } from "./asset";
+
 export type Vector2 = { x: number; y: number };
 export type Interval = [min: number, max: number];
 export type Spacing = { top: number; right: number; bottom: number; left: number };
@@ -114,7 +116,7 @@ export function isValue(value: unknown): value is Value {
   return (
     typeof value === "boolean" ||
     (typeof value === "number" && Number.isFinite(value)) ||
-    (typeof value === "string" && value.length <= 500) ||
+    (typeof value === "string" && (value.length <= 500 || isAssetSource(value))) ||
     isVector2(value) ||
     isSpacing(value) ||
     isInterval(value) ||

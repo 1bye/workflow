@@ -32,7 +32,7 @@ export async function initialize(project: string): Promise<string> {
   const config = {
     extends: relative(workspace, resolve(exampleRoot, "../../tsconfig.json")).replaceAll("\\", "/"),
     compilerOptions: {
-      types: [],
+      types: [resolve(exampleRoot, "../../node_modules/vite/client.d.ts")],
       paths: {
         "@local": [resolve(exampleRoot, "../schema/index.ts")],
         react: [resolve(exampleRoot, "../../node_modules/@types/react/index.d.ts")],

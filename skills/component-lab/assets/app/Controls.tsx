@@ -1,13 +1,29 @@
 import type { CSSProperties } from "react";
 import type { ControlMap, Values } from "../schema/index";
 import { title } from "../schema/entries";
-import type { ChangeControl } from "./types";
+import type { ActionStatus, ChangeControl } from "./types";
 import SelectControl from "./SelectControl";
 import CompoundControl from "./CompoundControl";
+import AssetEditor from "./controls/AssetControl";
+import ActionEditor from "./controls/ActionControl";
 
-type Props = { component: { controls: ControlMap }; values: Values; onChange: ChangeControl };
+type Props = {
+  component: { controls: ControlMap };
+  values: Values;
+  onChange: ChangeControl;
+  onAction: (key: string) => void;
+  action: ActionStatus | null;
+  previewReady: boolean;
+};
 
-export default function Controls({ component, values, onChange }: Props) {
+export default function Controls({
+  component,
+  values,
+  onChange,
+  onAction,
+  action,
+  previewReady,
+}: Props) {
   return (
     <form
       id="controls"
@@ -19,8 +35,32 @@ export default function Controls({ component, values, onChange }: Props) {
         .filter(([, control]) => !control.hidden)
         .map(([key, control]) => {
           const id = `control-${key}`;
-          const value = values[key] ?? control.default;
           const label = control.label ?? title(key);
+
+          if (control.type === "action")
+            return (
+              <ActionEditor
+                key={key}
+                control={control}
+                label={label}
+                busy={action?.key === key && action.busy}
+                disabled={!previewReady || !!action?.busy}
+                error={action?.key === key ? action.error : null}
+                onClick={() => onAction(key)}
+              />
+            );
+
+          const value = values[key] ?? control.default;
+
+          if (control.type === "asset")
+            return (
+              <AssetEditor
+                key={key}
+                label={label}
+                value={String(value)}
+                onChange={(next) => onChange(key, next)}
+              />
+            );
 
           if (
             control.type === "vector2" ||

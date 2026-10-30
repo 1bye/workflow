@@ -1,6 +1,7 @@
 import { createElement, type ComponentType, type ReactElement } from "react";
 import { Compound, parseCompound, type CompoundControl } from "./compound";
 import { sameValue, type Value, type Values } from "./values";
+import { isAssetSource } from "./asset";
 
 export type {
   Value,
@@ -37,20 +38,57 @@ export type SelectControl<T extends string = string> = Presentation & {
   default: T;
   options: readonly T[];
 };
+export type AssetControl = Presentation & { type: "asset"; default: string };
+export type ActionContext = { element: HTMLElement };
+export type ActionControl = Presentation & {
+  type: "action";
+  button: string;
+  onClick: (context: ActionContext) => void | Promise<void>;
+};
 export type AnyControl =
   | NumberControl
   | ColorControl
   | BooleanControl
   | TextControl
   | SelectControl
+  | AssetControl
+  | ActionControl
   | CompoundControl;
 export type ControlMap = Record<string, AnyControl>;
-type ControlProps<C extends ControlMap> = { -readonly [K in keyof C]: C[K]["default"] };
+type ValueControl = Exclude<AnyControl, ActionControl>;
+type ControlProps<C extends ControlMap> = {
+  -readonly [K in keyof C as C[K] extends ActionControl ? never : K]: C[K] extends {
+    default: infer D extends Value;
+  }
+    ? D
+    : never;
+};
 export type Props<S extends { controls: ControlMap }> = ControlProps<S["controls"]>;
 export type State<P> = { name?: string; description?: string; props?: Partial<P> };
 
 export const Control = {
   ...Compound,
+  Asset(options: Presentation & { default: string }): AssetControl {
+    if (!isAssetSource(options.default))
+      throw new Error(
+        "Assets need a local image path, an embedded image up to 256 KB, or an empty default.",
+      );
+
+    return { ...options, type: "asset" };
+  },
+  Action(
+    options: Presentation & {
+      button?: string;
+      onClick: ActionControl["onClick"];
+    },
+  ): ActionControl {
+    const button = options.button ?? "Run";
+
+    if (!button.trim() || typeof options.onClick !== "function")
+      throw new Error("Actions need a button label and a callback.");
+
+    return { ...options, button, type: "action" };
+  },
   Number(
     options: Presentation & {
       default: number;
@@ -119,8 +157,10 @@ export const Control = {
   },
 };
 
-function parseControl(control: AnyControl, value: unknown): Value {
+function parseControl(control: ValueControl, value: unknown): Value {
   switch (control.type) {
+    case "asset":
+      return isAssetSource(value) ? value : control.default;
     case "number":
       return typeof value === "number" && Number.isFinite(value)
         ? Math.min(control.max, Math.max(control.min, value))
@@ -168,7 +208,9 @@ export function Component<const C extends ControlMap>(
   if (!name.trim()) throw new Error("A component needs a name.");
 
   const defaults = Object.fromEntries(
-    Object.entries(options.controls).map(([key, control]) => [key, control.default]),
+    Object.entries(options.controls)
+      .filter((entry): entry is [string, ValueControl] => entry[1].type !== "action")
+      .map(([key, control]) => [key, control.default]),
   ) as ControlProps<C>;
 
   const states: Record<string, State<ControlProps<C>>> = options.states ?? { default: {} };
@@ -179,7 +221,7 @@ export function Component<const C extends ControlMap>(
     for (const [key, value] of Object.entries(definition.props ?? {})) {
       const control = options.controls[key];
 
-      if (!control || !sameValue(parseControl(control, value), value))
+      if (!control || control.type === "action" || !sameValue(parseControl(control, value), value))
         throw new Error(`Invalid prop "${key}" in state "${state}".`);
     }
   }
@@ -192,10 +234,9 @@ export function Component<const C extends ControlMap>(
 
     // Object.fromEntries cannot retain the mapped relationship between control keys and values.
     return Object.fromEntries(
-      Object.entries(options.controls).map(([key, control]) => [
-        key,
-        parseControl(control, source[key]),
-      ]),
+      Object.entries(options.controls)
+        .filter((entry): entry is [string, ValueControl] => entry[1].type !== "action")
+        .map(([key, control]) => [key, parseControl(control, source[key])]),
     ) as ControlProps<C>;
   }
 

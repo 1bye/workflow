@@ -1,4 +1,5 @@
 import * as Schema from "@local";
+import image from "./asset.svg";
 
 const controls = Schema.Component("Controls demo", {
   thumbnail: new URL("./thumbnail.svg", import.meta.url).href,
@@ -60,6 +61,23 @@ const controls = Schema.Component("Controls demo", {
         topRight: 12,
         bottomRight: 12,
         bottomLeft: 12,
+      },
+    }),
+    asset: Schema.Control.Asset({ default: image }),
+    replay: Schema.Control.Action({
+      label: "Action",
+      button: "Replay",
+      onClick: async ({ element }) => {
+        await element.animate(
+          [
+            { opacity: 0.25, transform: "scale(.96)" },
+            { opacity: 1, transform: "scale(1)" },
+          ],
+          {
+            duration: matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 800,
+            easing: "ease-out",
+          },
+        ).finished;
       },
     }),
     position: Schema.Control.Vector2({

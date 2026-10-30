@@ -7,7 +7,7 @@ import type { Theme } from "./theme";
 import type { Components } from "../schema/entries";
 import type { Value } from "../schema/index";
 import { isRecord, type Settings } from "../settings";
-import type { RenderMessage } from "./types";
+import { isActionResult, type ActionMessage, type ActionStatus, type RenderMessage } from "./types";
 
 type Props = {
   initialTheme: Theme;
@@ -31,6 +31,7 @@ export default function App({
   const [error, setError] = useState<string | null>(null);
   const [storageError, setStorageError] = useState(false);
   const [previewVersion, setPreviewVersion] = useState(0);
+  const [action, setAction] = useState<ActionStatus | null>(null);
   const preview = useRef<HTMLIFrameElement>(null);
   const panels = usePanels();
   const selected = components.find((component) => component.id === selectedId) ?? components[0];
@@ -56,7 +57,22 @@ export default function App({
 
       if (!isRecord(event.data)) return;
 
-      if (event.data.type === "ready") setPreviewVersion((version) => version + 1);
+      if (isActionResult(event.data)) {
+        const result = event.data;
+
+        setAction((current) =>
+          current?.requestId === result.requestId
+            ? { ...current, busy: false, error: result.error }
+            : current,
+        );
+
+        return;
+      }
+
+      if (event.data.type === "ready") {
+        setPreviewVersion((version) => version + 1);
+        setAction(null);
+      }
 
       if (event.data.type === "error" && typeof event.data.message === "string")
         setError(event.data.message);
@@ -94,6 +110,18 @@ export default function App({
         [selected.id]: { ...current.components[selected.id], [key]: value },
       },
     }));
+  }
+
+  function triggerAction(key: string) {
+    if (action?.busy) return;
+
+    const requestId = crypto.randomUUID();
+
+    setAction({ id: selected.id, key, requestId, busy: true, error: null });
+    preview.current?.contentWindow?.postMessage(
+      { type: "action", id: selected.id, key, requestId } satisfies ActionMessage,
+      location.origin,
+    );
   }
 
   return (
@@ -140,7 +168,10 @@ export default function App({
                   data-id={component.id}
                   aria-pressed={selected.id === component.id}
                   className="flex min-w-0 flex-col items-stretch rounded-[7px] border-0 bg-(--lab-panel) p-[5px] text-left hover:bg-(--lab-control) aria-pressed:bg-(--lab-control)"
-                  onClick={() => setSelectedId(component.id)}
+                  onClick={() => {
+                    setSelectedId(component.id);
+                    setAction(null);
+                  }}
                 >
                   <img
                     alt=""
@@ -185,7 +216,15 @@ export default function App({
               </button>
               <ThemeSwitch theme={theme} onChange={setTheme} />
             </div>
-            <Controls component={selected} values={values} onChange={updateControl} />
+            <Controls
+              key={selected.id}
+              component={selected}
+              values={values}
+              onChange={updateControl}
+              onAction={triggerAction}
+              action={action?.id === selected.id ? action : null}
+              previewReady={previewVersion > 0}
+            />
             {storageError ? (
               <p role="alert" className="mt-2 text-[9px] text-(--lab-error-text)">
                 Couldn’t save changes in this browser.

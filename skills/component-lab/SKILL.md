@@ -36,6 +36,11 @@ Gradient adds angle and color stops; Shadow adds offset, blur, spread, color,
 opacity, and inset. `gradientCSS(value)` and `shadowCSS(value)` convert them to CSS.
 Typography values map directly to React styles; optional `fonts` lists the available
 families. Corners stores four pixel radii; `cornersCSS(value)` formats them for CSS.
+Asset supplies an image source string: use an imported image, a `/drafts/` path, or
+choose an image up to 256 KB in the panel. Chosen files are embedded in local storage.
+Action takes `{ button, onClick: ({ element }) => ... }`; its callback runs inside
+the preview for each visible state and can return a promise. Actions are excluded
+from component props and saved settings. The demo's Replay action shows this.
 Named states override shared props. IDs default to the entry's path inside
 `components/` (for example `maps/pin`); an optional explicit `id` preserves
 identity when moving files. Duplicate IDs are errors.

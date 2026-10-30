@@ -44,6 +44,8 @@ const schema = Schema.Component("Typed example", {
     corners: Schema.Control.Corners({
       default: { topLeft: 8, topRight: 8, bottomRight: 8, bottomLeft: 8 },
     }),
+    asset: Schema.Control.Asset({ default: "" }),
+    replay: Schema.Control.Action({ onClick: () => {} }),
   },
   states: { expanded: { props: { open: true, variant: "bright" } } },
 });
@@ -68,6 +70,7 @@ export type InferredProps = Assert<
       shadow: Schema.Shadow;
       typography: Schema.Typography;
       corners: Schema.Corners;
+      asset: string;
     }
   >
 >;
@@ -79,6 +82,18 @@ export function acceptedBinding() {
 }
 
 export function rejectedExamples() {
+  // @ts-expect-error Asset sources must be strings.
+  Schema.Control.Asset({ default: 123 });
+  // @ts-expect-error Action callbacks are required.
+  Schema.Control.Action({ button: "Run" });
+  Schema.Component("Actions are not props", {
+    controls: {
+      replay: Schema.Control.Action({ onClick: () => {} }),
+      text: Schema.Control.Text({ default: "" }),
+    },
+    // @ts-expect-error Actions cannot be overridden by state snapshots.
+    states: { wrong: { props: { replay: 1 } } },
+  });
   // @ts-expect-error A number control cannot bind to a string prop.
   schema.from((props: { size: string }) => createElement("div", null, props.size));
   // @ts-expect-error Required props must be supplied by the schema.

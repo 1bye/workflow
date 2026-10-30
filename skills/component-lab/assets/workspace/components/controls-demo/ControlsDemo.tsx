@@ -16,6 +16,7 @@ export default function ControlsDemo({
   shadow,
   typography,
   corners,
+  asset,
 }: ControlsProps) {
   return (
     <div className="flex min-h-[180px] w-full min-w-0 flex-col items-center justify-center gap-5 px-3 py-6">
@@ -68,6 +69,14 @@ export default function ControlsDemo({
           Aa Bb Cc 0123
         </span>
       </div>
+      {asset ? (
+        <img
+          src={asset}
+          alt="Asset preview"
+          className="h-20 w-full max-w-[224px] object-cover"
+          style={{ borderRadius: cornersCSS(corners) }}
+        />
+      ) : null}
     </div>
   );
 }
