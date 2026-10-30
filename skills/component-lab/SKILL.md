@@ -5,56 +5,19 @@ description: Open a local workbench for previewing and tweaking draft UI compone
 
 # Component Lab
 
-The prototype uses TypeScript, Vite, React, and Tailwind. With Node.js 22.12 or newer,
-install its locked dependencies once, then launch it:
+Use the bundled TypeScript, Vite, React, and Tailwind workbench to develop draft
+components with live controls and visible states. Keep project drafts in
+`.component-lab/`; the workbench and schema implementation stay bundled here.
 
-```sh
-npm --prefix <skill-dir> ci
-npm --prefix <skill-dir> run dev -- <project-dir>
-```
+Read the guide for the work at hand:
 
-Open the printed local URL. Use `--port 4320` if the default port, 4317, is busy.
-Stop the process when the preview is no longer needed.
+- [Workspace](references/workspace.md): launching, project files, persistence, and validation.
+- [Components](references/components.md): schema definitions, inferred props, binding, and states.
+- [Controls](references/controls.md): choosing and configuring the available control types.
+- [SVG thumbnails](references/thumbnails.md): generating minimal component-list previews and wiring them into the schema.
 
-The launcher creates `.component-lab/` in the project on first use, with pin and
-controls examples, a TypeScript config, and `settings.json`. Existing workspaces are
-preserved. The shell and schema implementation stay bundled in this skill.
+When adding a component, use the component and thumbnail guides; consult controls
+for the inputs it needs. Preserve existing workspace files and user tweaks.
 
-Components are discovered at `components/**/index.ts`. Define controls with
-`Schema.Component` and `Schema.Control` from `@local`, infer component props
-with `Schema.Props<typeof schema>`, and export `schema.from(Component)` from
-the entry. See [pin.schema.ts](assets/workspace/components/pin/pin.schema.ts),
-[Pin.tsx](assets/workspace/components/pin/Pin.tsx), and
-[index.ts](assets/workspace/components/pin/index.ts).
-
-Controls are keyed by prop name. Number, Color, Boolean, Text, and Select
-builders provide defaults; `label` and `hidden` configure the tweaks panel.
-Vector2, Interval, Spacing, and Easing provide compact inline editors. Their values
-are `{ x, y }`, `[min, max]`, `{ top, right, bottom, left }`, and the four CSS
-cubic Bézier handles respectively; these remain typed and save to local storage.
-Gradient adds angle and color stops; Shadow adds offset, blur, spread, color,
-opacity, and inset. `gradientCSS(value)` and `shadowCSS(value)` convert them to CSS.
-Typography values map directly to React styles; optional `fonts` lists the available
-families. Corners stores four pixel radii; `cornersCSS(value)` formats them for CSS.
-Asset supplies an image source string: use an imported image, a `/drafts/` path, or
-choose an image up to 256 KB in the panel. Chosen files are embedded in local storage.
-Action takes `{ button, onClick: ({ element }) => ... }`; its callback runs inside
-the preview for each visible state and can return a promise. Actions are excluded
-from component props and saved settings. The demo's Replay action shows this.
-Named states override shared props. IDs default to the entry's path inside
-`components/` (for example `maps/pin`); an optional explicit `id` preserves
-identity when moving files. Duplicate IDs are errors.
-
-Vite handles TSX and hot updates; Tailwind scans both the shell and the project
-draft folder. Controls and component selection save
-automatically in browser local storage, separately for each project. Theme and
-panel sizes are also remembered. `settings.json` supplies starting values.
-
-Existing workspaces are never overwritten. Older JavaScript drafts need to be
-converted to the typed schema and entry format. Project-specific styles/providers
-and timeline support are deferred.
-
-For validation, run `npm --prefix <skill-dir> run check-types`,
-`npm --prefix <skill-dir> test`, and
-`npm --prefix <skill-dir> run build`. The build checks the bundled example;
-the launcher serves the selected project's drafts.
+Project-specific styles/providers, timeline support, and the broader design and
+promotion workflow remain deferred.
