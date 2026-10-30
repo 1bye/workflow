@@ -83,7 +83,15 @@ test("initialization preserves drafts; the local server saves settings and confi
     );
     const settings = {
       version: 1,
-      components: { pin: { size: 55, label: "Saved place", showLabel: false } },
+      components: {
+        pin: { size: 55, label: "Saved place", showLabel: false },
+        demo: {
+          position: { x: 12, y: -8 },
+          width: [120, 240],
+          padding: { top: 8, right: 12, bottom: 8, left: 12 },
+          easing: [0.25, 0.1, 0.25, 1],
+        },
+      },
     };
 
     assert.equal((await post(settings)).status, 200);
@@ -94,7 +102,10 @@ test("initialization preserves drafts; the local server saves settings and confi
     assert.deepEqual(await (await get("/api/settings")).json(), settings);
     assert.equal((await post(settings, "https://other.example")).status, 403);
     assert.equal((await post({ version: 9 })).status, 400);
-    assert.equal((await post({ ...settings, components: { pin: { bad: [1, 2] } } })).status, 400);
+    assert.equal(
+      (await post({ ...settings, components: { pin: { bad: [1, 2, 3] } } })).status,
+      400,
+    );
     assert.equal((await post({ ...settings, extra: "x".repeat(70000) })).status, 413);
     assert.deepEqual(
       JSON.parse(await readFile(join(workspace, "settings.json"), "utf8")),

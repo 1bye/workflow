@@ -25,6 +25,27 @@ const controls = Schema.Component("Controls demo", {
       label: "Weight",
       default: "medium",
     }),
+    position: Schema.Control.Vector2({
+      label: "Vector2",
+      default: { x: 0, y: 0 },
+      min: -60,
+      max: 60,
+      unit: "px",
+    }),
+    width: Schema.Control.Interval({
+      label: "Interval",
+      default: [120, 240],
+      min: 80,
+      max: 320,
+      unit: "px",
+    }),
+    padding: Schema.Control.Spacing({
+      label: "Spacing",
+      default: { top: 14, right: 20, bottom: 14, left: 20 },
+      max: 40,
+      unit: "px",
+    }),
+    easing: Schema.Control.Easing({ label: "Easing", default: [0.25, 0.1, 0.25, 1] }),
   },
   states: { preview: { name: "Live preview", description: "Your changes, live." } },
 });

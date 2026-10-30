@@ -48,9 +48,17 @@
 }
 /* The full row is the slider; the native input keeps pointer and keyboard support. */
 [data-control="number"] { background: linear-gradient(to right, var(--lab-fill) var(--fill), var(--lab-control) var(--fill)); }
-#controls input[type="range"] { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; appearance: none; opacity: 0; cursor: ew-resize; }
-#controls input[type="range"]::-webkit-slider-thumb { appearance: none; width: 1px; height: 30px; }
-#controls input[type="range"]::-moz-range-thumb { width: 1px; height: 30px; border: 0; }
+#controls [data-control="number"] input[type="range"] { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; appearance: none; opacity: 0; cursor: ew-resize; }
+#controls [data-control="number"] input[type="range"]::-webkit-slider-thumb { appearance: none; width: 1px; height: 30px; }
+#controls [data-control="number"] input[type="range"]::-moz-range-thumb { width: 1px; height: 30px; border: 0; }
+#controls input[type="number"] { appearance: textfield; }
+#controls input[type="number"]::-webkit-inner-spin-button,
+#controls input[type="number"]::-webkit-outer-spin-button { appearance: none; margin: 0; }
+#controls [data-control="interval"] input[type="range"] { position: absolute; inset: 0; width: 100%; height: 16px; margin: 0; appearance: none; background: transparent; pointer-events: none; }
+#controls [data-control="interval"] input[type="range"]::-webkit-slider-thumb { appearance: none; width: 8px; height: 8px; border: 0; border-radius: 50%; background: var(--lab-text); box-shadow: 0 0 0 2px var(--lab-control); pointer-events: auto; cursor: ew-resize; }
+#controls [data-control="interval"] input[type="range"]::-moz-range-thumb { width: 8px; height: 8px; border: 0; border-radius: 50%; background: var(--lab-text); box-shadow: 0 0 0 2px var(--lab-control); pointer-events: auto; cursor: ew-resize; }
+@container controls (min-width: 200px) { [data-easing-values] { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@container controls (max-width: 180px) { [data-vector-values] { grid-template-columns: 1fr; } [data-interval-fields] { grid-template-columns: 1fr; } }
 #controls input[type="color"] { flex-shrink: 0; width: 16px; height: 16px; padding: 0; border: 0; border-radius: 3px; overflow: hidden; background: transparent; cursor: pointer; }
 #controls input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
 #controls input[type="color"]::-webkit-color-swatch { border: 1px solid var(--lab-border); border-radius: 3px; }

@@ -3,6 +3,7 @@ import type { ControlMap, Values } from "../schema/index";
 import { title } from "../schema/entries";
 import type { ChangeControl } from "./types";
 import SelectControl from "./SelectControl";
+import CompoundControl from "./CompoundControl";
 
 type Props = { component: { controls: ControlMap }; values: Values; onChange: ChangeControl };
 
@@ -20,6 +21,22 @@ export default function Controls({ component, values, onChange }: Props) {
           const id = `control-${key}`;
           const value = values[key] ?? control.default;
           const label = control.label ?? title(key);
+
+          if (
+            control.type === "vector2" ||
+            control.type === "interval" ||
+            control.type === "spacing" ||
+            control.type === "easing"
+          )
+            return (
+              <CompoundControl
+                key={key}
+                control={control}
+                label={label}
+                value={value}
+                onChange={(next) => onChange(key, next)}
+              />
+            );
 
           return (
             <div
@@ -114,7 +131,7 @@ export default function Controls({ component, values, onChange }: Props) {
                         className="pointer-events-none relative shrink-0 font-mono text-[10px] text-(--lab-muted) tabular-nums"
                         htmlFor={id}
                       >
-                        {value}
+                        {Number(value)}
                         <span className="ml-0.5 text-(--lab-muted)">{control.unit}</span>
                       </output>
                       <input

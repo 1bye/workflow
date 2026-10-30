@@ -29,6 +29,9 @@ the entry. See [pin.schema.ts](assets/workspace/components/pin/pin.schema.ts),
 
 Controls are keyed by prop name. Number, Color, Boolean, Text, and Select
 builders provide defaults; `label` and `hidden` configure the tweaks panel.
+Vector2, Interval, Spacing, and Easing provide compact inline editors. Their values
+are `{ x, y }`, `[min, max]`, `{ top, right, bottom, left }`, and the four CSS
+cubic Bézier handles respectively; these remain typed and save to local storage.
 Named states override shared props. IDs default to the entry's path inside
 `components/` (for example `maps/pin`); an optional explicit `id` preserves
 identity when moving files. Duplicate IDs are errors.

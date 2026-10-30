@@ -1,8 +1,9 @@
 import { createElement, type ComponentType, type ReactElement } from "react";
+import { Compound, parseCompound, type CompoundControl } from "./compound";
+import { sameValue, type Value, type Values } from "./values";
 
-export type Value = string | number | boolean;
-export type Values = Record<string, Value>;
-type Presentation = { label?: string; hidden?: boolean };
+export type { Value, Values, Vector2, Interval, Spacing, Easing } from "./values";
+export type Presentation = { label?: string; hidden?: boolean };
 export type NumberControl = Presentation & {
   type: "number";
   default: number;
@@ -28,20 +29,15 @@ export type AnyControl =
   | ColorControl
   | BooleanControl
   | TextControl
-  | SelectControl;
+  | SelectControl
+  | CompoundControl;
 export type ControlMap = Record<string, AnyControl>;
-type ControlValue<C> = C extends NumberControl
-  ? number
-  : C extends BooleanControl
-    ? boolean
-    : C extends SelectControl<infer T>
-      ? T
-      : string;
-type ControlProps<C extends ControlMap> = { -readonly [K in keyof C]: ControlValue<C[K]> };
+type ControlProps<C extends ControlMap> = { -readonly [K in keyof C]: C[K]["default"] };
 export type Props<S extends { controls: ControlMap }> = ControlProps<S["controls"]>;
 export type State<P> = { name?: string; description?: string; props?: Partial<P> };
 
 export const Control = {
+  ...Compound,
   Number(
     options: Presentation & {
       default: number;
@@ -124,6 +120,11 @@ function parseControl(control: AnyControl, value: unknown): Value {
       return typeof value === "string" ? value.slice(0, control.maxLength) : control.default;
     case "select":
       return typeof value === "string" && control.options.includes(value) ? value : control.default;
+    case "vector2":
+    case "interval":
+    case "spacing":
+    case "easing":
+      return parseCompound(control, value);
   }
 }
 
@@ -161,7 +162,7 @@ export function Component<const C extends ControlMap>(
     for (const [key, value] of Object.entries(definition.props ?? {})) {
       const control = options.controls[key];
 
-      if (!control || parseControl(control, value) !== value)
+      if (!control || !sameValue(parseControl(control, value), value))
         throw new Error(`Invalid prop "${key}" in state "${state}".`);
     }
   }
