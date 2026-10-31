@@ -21,6 +21,12 @@ Score each criterion 1-5 (5 = no issues):
 - voice: author's person, wording of technical terms, and tone kept; filler
   and chatbot phrases removed.
 
+If there is a <prompt> instead of an <input>, the output is an answer written
+directly in this format. Grade fidelity as technical correctness, and
+completeness as whether a strong expert answer's key points, caveats, and
+commands are present; list gaps in "missing". Voice is plain and direct, with
+no filler.
+
 If a <golden> block is present, it is an output the user rated highly. Use it
 as a reference for shape, not as the only acceptable answer.
 

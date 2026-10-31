@@ -10,6 +10,9 @@ import type { Value } from "../schema/index";
 import { isRecord } from "../settings";
 import { isTheme, type Theme } from "./theme";
 import { isCanvas, isInstanceId, type Canvas } from "./canvas";
+import { isComponentId } from "../schema/entries";
+
+export type ComparisonItem = { id: string; canvas: Canvas };
 
 export type RenderMessage = {
   type: "render";
@@ -18,6 +21,7 @@ export type RenderMessage = {
   theme: Theme;
   inspectSpacing?: boolean;
   spacingScope?: SpacingScope;
+  comparison?: ComparisonItem[];
 };
 
 export function isRenderMessage(value: unknown): value is RenderMessage {
@@ -28,7 +32,19 @@ export function isRenderMessage(value: unknown): value is RenderMessage {
     isCanvas(value.canvas) &&
     isTheme(value.theme) &&
     (value.inspectSpacing === undefined || typeof value.inspectSpacing === "boolean") &&
-    (value.spacingScope === undefined || isSpacingScope(value.spacingScope))
+    (value.spacingScope === undefined || isSpacingScope(value.spacingScope)) &&
+    (value.comparison === undefined ||
+      (Array.isArray(value.comparison) &&
+        value.comparison.length >= 2 &&
+        value.comparison.every(
+          (item) =>
+            isRecord(item) &&
+            typeof item.id === "string" &&
+            isComponentId(item.id) &&
+            isCanvas(item.canvas),
+        ) &&
+        new Set(value.comparison.map((item) => item.id)).size === value.comparison.length &&
+        value.comparison.some((item) => item.id === value.id)))
   );
 }
 

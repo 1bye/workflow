@@ -111,13 +111,13 @@ export default function SpacingInspector({
   enabled,
   scope,
   theme,
-  componentId,
+  contextId,
   revision,
 }: {
   enabled: boolean;
   scope: SpacingScope;
   theme: Theme;
-  componentId: string;
+  contextId: string;
   revision: Canvas;
 }) {
   const [measurement, setMeasurement] = useState<Measurement | null>(null);
@@ -375,7 +375,7 @@ export default function SpacingInspector({
 
       const path = parts.join("/");
 
-      if (!root?.dataset.instanceId || !isSpacingPath(path)) return;
+      if (!root?.dataset.instanceId || !root.dataset.componentId || !isSpacingPath(path)) return;
 
       event.preventDefault();
       event.stopImmediatePropagation();
@@ -410,7 +410,7 @@ export default function SpacingInspector({
         parent.postMessage(
           {
             type: "spacing-change",
-            id: componentId,
+            id: root.dataset.componentId,
             instanceId: root.dataset.instanceId,
             path,
             edits: values,
@@ -516,7 +516,7 @@ export default function SpacingInspector({
       window.removeEventListener("scroll", schedule, true);
       window.removeEventListener("resize", schedule);
     };
-  }, [enabled, componentId]);
+  }, [enabled, contextId]);
 
   useEffect(() => refresh.current(), [revision]);
   useEffect(() => {

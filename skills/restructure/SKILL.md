@@ -1,14 +1,46 @@
 ---
 name: restructure
-description: Reformat a long AI reply (ChatGPT, Claude, Gemini, any wall of text) into a scannable Markdown structure without dropping technical detail. Use when asked to restructure, reformat, make readable, or "make this skimmable" for a pasted message, especially postmortems, explanations, recommendations, and specs. Not a summary.
+description: Write answers, or reformat a pasted AI reply (ChatGPT, Claude, Gemini, any wall of text), as scannable Markdown without dropping technical detail. Use when a message starts with or includes this skill's name, or when asked to restructure, reformat, or "make this skimmable". Answer mode replies to the request in this format; reformat mode rewrites pasted text. Not a summary.
 ---
 
 # Restructure
 
-Turn a dense reply into something the user can scan in seconds and still read
-in full. The output keeps every fact; only the shape changes.
+Produce text the user can scan in seconds and still read in full: bottom line
+first, short labeled bullets, every technical detail kept.
+
+## Modes
+
+Pick the mode from what follows the invocation:
+
+- **Answer mode** (default): the message is a question or task. Do the work
+  as usual, then write the reply in this format. Everything after "Contract"
+  applies, reading "the input" as the full answer you would otherwise give.
+- **Reformat mode**: the message is mostly pasted text (another AI's reply, a
+  doc, a long message), or the user asks to restructure or reformat it.
+  Rewrite that text; do not answer it or add your own views.
+
+When unsure, treat a block over ~80 words with no question of its own as
+pasted text to reformat.
+
+### Answer mode
+
+- **Same depth.** Give the full answer you would have written in prose, with
+  every reason, value, caveat, and command. The format replaces paragraphs,
+  not content.
+- **Draft, then shape.** Decide the content first (inventory step below),
+  then lay it out. Do not drop a point because it doesn't fit a skeleton;
+  add a section for it.
+- **Your voice.** Write in first and second person as normal; the voice rule
+  below protects other authors' text in reformat mode.
+- **Unknowns stay visible.** Put assumptions and open questions in their own
+  `Assumptions` or `Open questions` section instead of burying them.
+- **Short replies stay short.** If the whole answer fits in three lines, give
+  three lines; no headings.
 
 ## Contract
+
+These rules bind reformat mode exactly. In answer mode, apply them to your own
+draft: no padding, no repetition, no filler, values exact.
 
 - **Lossless.** Every claim, cause, number, unit, value, name, example,
   caveat, and recommendation in the input appears in the output. Copy values
@@ -44,7 +76,7 @@ in full. The output keeps every fact; only the shape changes.
    bullet against the input: delete any clause the author did not write the
    meaning of, and any fact stated a second time. Fix gaps before returning.
 
-Return only the restructured Markdown. No "Here is the restructured version."
+Return only the Markdown. No "Here is the restructured version", no "Sure!".
 
 ## Skeletons
 

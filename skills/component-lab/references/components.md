@@ -62,6 +62,35 @@ to generate the component-list preview. The bundled [pin example](../assets/work
 and [controls demo](../assets/workspace/components/controls-demo/controls.schema.ts)
 show the current API in use.
 
+## Folders and comparison
+
+Directories above a component's own directory appear as folders in the component
+grid. For example, `components/inputs/button/index.ts` appears inside Inputs;
+`components/inputs/toggles/switch/index.ts` appears inside Inputs / Toggles.
+Folder tiles show descendant counts, breadcrumbs navigate back, and search looks
+across all folders by component name or directory path.
+
+Before moving an existing draft into a folder, set its explicit schema `id` to
+its current ID. Move the complete component directory, including sibling assets.
+This preserves saved tweaks, instances, and spacing overrides. New components may
+continue to use automatic IDs. The first version browses filesystem folders;
+folder creation and moves are performed in the project files, not by dragging tiles.
+
+Command/Ctrl-click component tiles to select them for comparison. The current
+component is included when starting a selection. Click Compare once at least two
+are selected; selections can span folders and search results. Click a rendered
+preview to edit that component and instance in controls. Names below previews
+identify components; the selected preview gets the same small Selected label.
+Duplicate, reset, actions, and spacing edits target the selected component's
+instance. All instances stay independent, including different components with the
+same instance ID. The comparison row wraps when space runs out.
+
+Done or clearing the comparison selection returns to the original component.
+Comparison selection is temporary; edits and instance changes still autosave.
+Leaving comparison does not delete previews or reset values. Selecting an unrelated
+component normally opens its single-component view. Presets and synchronized
+controls remain deferred.
+
 ## Preview instances and identity
 
 Each component opens as one centered, interactive preview using its configured
@@ -105,7 +134,8 @@ remains normal.
 
 Spacing edits autosave per preview instance and duplicate independently. They are
 preview CSS overrides, separate from schema props, and do not update component source.
-“Reset spacing” clears them for the selected instance. Targets follow rendered DOM
+The Reset dropdown offers “Reset tweaks” for schema props and “Reset spacing” for
+preview spacing overrides, independently on the selected instance. Targets follow rendered DOM
 child paths, so source structure changes may require resetting spacing edits.
 Component controls and live interactions remain available. Escape, the cursor button, or clicking empty
 canvas space exits inspection.

@@ -1,0 +1,23 @@
+{
+  "name": "ui-evolution-video-toolkit",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test evals/toolkit.test.mjs",
+    "eval:fixtures": "node evals/eval.mjs fixtures",
+    "validate": "node scripts/validate.mjs .",
+    "preview": "node scripts/render.mjs . --preview",
+    "render": "node scripts/render.mjs .",
+    "review": "node scripts/review-frames.mjs ."
+  },
+  "dependencies": {
+    "@remotion/bundler": "4.0.539",
+    "@remotion/renderer": "4.0.539",
+    "ajv": "8.17.1",
+    "playwright": "1.64.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "remotion": "4.0.539"
+  }
+}

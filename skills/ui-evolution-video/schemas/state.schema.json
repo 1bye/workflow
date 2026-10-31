@@ -1,0 +1,84 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "id", "viewport", "background", "source", "elements", "warnings"],
+  "properties": {
+    "version": {"const": 1},
+    "id": {"type": "string", "minLength": 1},
+    "viewport": {
+      "type": "object", "additionalProperties": false, "required": ["width", "height"],
+      "properties": {"width": {"type": "integer", "minimum": 1}, "height": {"type": "integer", "minimum": 1}}
+    },
+    "background": {"type": "string", "minLength": 1},
+    "screenshot": {"type": "string"},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "source": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "ref", "method", "assumptions", "attempts"],
+      "properties": {
+        "kind": {"enum": ["git", "working-tree", "screenshot", "design", "code", "fixture"]},
+        "ref": {"type": "string", "minLength": 1},
+        "revision": {"type": "string", "pattern": "^[a-f0-9]{40,64}$"},
+        "method": {"enum": ["full-app", "component-harness", "source-rebuild", "screenshot-rebuild"]},
+        "assumptions": {"type": "array", "items": {"type": "string"}},
+        "attempts": {
+          "type": "array", "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["method", "status", "seconds", "reason"],
+            "properties": {
+              "method": {"enum": ["full-app", "component-harness", "source-rebuild", "screenshot-rebuild"]},
+              "status": {"enum": ["failed", "timeout", "succeeded", "skipped"]},
+              "seconds": {"type": "number", "minimum": 0},
+              "reason": {"type": "string", "minLength": 1}
+            }
+          }
+        }
+      }
+    },
+    "elements": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "parent", "kind", "rect", "style", "opacity", "z", "evidence"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "parent": {"type": ["string", "null"]},
+          "kind": {"enum": ["box", "text", "image"]},
+          "text": {"type": "string"},
+          "asset": {"type": "string", "minLength": 1},
+          "opacity": {"type": "number", "minimum": 0, "maximum": 1},
+          "z": {"type": "number"},
+          "rect": {
+            "type": "object", "additionalProperties": false, "required": ["x", "y", "width", "height"],
+            "properties": {
+              "x": {"type": "number"}, "y": {"type": "number"},
+              "width": {"type": "number", "exclusiveMinimum": 0}, "height": {"type": "number", "exclusiveMinimum": 0}
+            }
+          },
+          "style": {
+            "type": "object", "additionalProperties": false,
+            "properties": {
+              "backgroundColor": {"type": "string"}, "color": {"type": "string"},
+              "borderColor": {"type": "string"}, "borderWidth": {"type": "number", "minimum": 0},
+              "borderStyle": {"type": "string"}, "borderRadius": {"type": "string"},
+              "boxShadow": {"type": "string"}, "fontFamily": {"type": "string"},
+              "fontSize": {"type": "number", "exclusiveMinimum": 0}, "fontWeight": {"type": "string"},
+              "lineHeight": {"type": "string"}, "letterSpacing": {"type": "string"},
+              "textAlign": {"type": "string"}, "whiteSpace": {"type": "string"},
+              "padding": {"type": "string"}, "objectFit": {"type": "string"}
+            }
+          },
+          "evidence": {
+            "type": "object", "additionalProperties": false,
+            "properties": {"selector": {"type": "string"}, "role": {"type": "string"}, "name": {"type": "string"}}
+          }
+        },
+        "allOf": [
+          {"if": {"properties": {"kind": {"const": "text"}}}, "then": {"required": ["text"]}},
+          {"if": {"properties": {"kind": {"const": "image"}}}, "then": {"required": ["asset"]}}
+        ]
+      }
+    }
+  }
+}

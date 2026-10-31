@@ -42,13 +42,18 @@ function Preview() {
       let error: string | null = null;
 
       try {
-        const definition = components.find((component) => component.id === data?.id);
+        const definition = components.find((component) => component.id === message.id);
+        const visible = data?.comparison ?? (data ? [{ id: data.id, canvas: data.canvas }] : []);
 
         const element = Array.from(
           document.querySelectorAll<HTMLElement>("[data-component-preview]"),
-        ).find((item) => item.dataset.instanceId === message.instanceId);
+        ).find(
+          (item) =>
+            item.dataset.componentId === message.id &&
+            item.dataset.instanceId === message.instanceId,
+        );
 
-        if (!definition || definition.id !== message.id || !element)
+        if (!definition || !visible.some((item) => item.id === message.id) || !element)
           throw new Error("The preview is not ready.");
 
         await runAction(definition.controls, message.key, [element]);
@@ -69,21 +74,27 @@ function Preview() {
     window.addEventListener("message", receive);
 
     return () => window.removeEventListener("message", receive);
-  }, [data?.id]);
+  }, [data]);
 
   if (!data) return null;
 
-  const definition = components.find((component) => component.id === data.id);
+  const groups = (data.comparison ?? [{ id: data.id, canvas: data.canvas }]).map((item) => {
+    const definition = components.find((component) => component.id === item.id);
 
-  if (!definition) throw new Error(`Unknown component: ${data.id}`);
+    if (!definition) throw new Error(`Unknown component: ${item.id}`);
 
-  function select(instanceId: string) {
-    if (!data || data.canvas.selectedId === instanceId) return;
+    return { ...item, definition };
+  });
+
+  const count = groups.reduce((sum, group) => sum + group.canvas.instances.length, 0);
+
+  function select(id: string, instanceId: string) {
+    if (!data || (data.id === id && data.canvas.selectedId === instanceId)) return;
 
     parent.postMessage(
       {
         type: "select-instance",
-        id: data.id,
+        id,
         instanceId,
       } satisfies SelectInstanceMessage,
       location.origin,
@@ -92,61 +103,77 @@ function Preview() {
 
   return (
     <>
-      <style>{spacingCSS(data.canvas.instances)}</style>
+      <style>
+        {groups.map((group) => spacingCSS(group.canvas.instances, group.id)).join("\n")}
+      </style>
       <main
         id="preview-canvas"
-        aria-label={`${definition.name} canvas`}
+        aria-label={
+          data.comparison ? "Component comparison canvas" : `${groups[0]!.definition.name} canvas`
+        }
         data-theme={data.theme}
         data-inspecting={data.inspectSpacing ?? false}
-        data-multiple={data.canvas.instances.length > 1}
+        data-multiple={count > 1}
+        data-comparing={!!data.comparison}
         className="preview-canvas bg-(--lab-bg) text-(--lab-text)"
       >
-        {data.canvas.instances.map((instance, index) => (
-          <section
-            key={`${definition.id}:${instance.id}`}
-            data-instance={instance.id}
-            data-selected={data.canvas.selectedId === instance.id}
-            aria-label={`${definition.name} preview ${index + 1}`}
-            aria-current={data.canvas.selectedId === instance.id ? "true" : undefined}
-            tabIndex={data.canvas.instances.length > 1 ? 0 : -1}
-            className="preview-instance"
-            style={
-              {
-                "--preview-min-width": `${definition.preview?.minWidth ?? 0}px`,
-              } as CSSProperties
-            }
-            onPointerDownCapture={() => select(instance.id)}
-            onFocusCapture={() => select(instance.id)}
-            onKeyDown={(event) => {
-              if (
-                event.target === event.currentTarget &&
-                (event.key === "Enter" || event.key === " ")
-              ) {
-                event.preventDefault();
-                select(instance.id);
+        {groups.flatMap(({ definition, canvas }) =>
+          canvas.instances.map((instance, index) => (
+            <section
+              key={`${definition.id}:${instance.id}`}
+              data-instance={instance.id}
+              data-component-id={definition.id}
+              data-selected={data.id === definition.id && data.canvas.selectedId === instance.id}
+              aria-label={`${definition.name} preview ${index + 1}`}
+              aria-current={
+                data.id === definition.id && data.canvas.selectedId === instance.id
+                  ? "true"
+                  : undefined
               }
-            }}
-          >
-            <div
-              data-component-preview
-              data-instance-id={instance.id}
-              className="flex w-full min-w-0 items-center justify-center"
+              tabIndex={count > 1 ? 0 : -1}
+              className="preview-instance"
+              style={
+                {
+                  "--preview-min-width": `${definition.preview?.minWidth ?? 0}px`,
+                } as CSSProperties
+              }
+              onPointerDownCapture={() => select(definition.id, instance.id)}
+              onFocusCapture={() => select(definition.id, instance.id)}
+              onKeyDown={(event) => {
+                if (
+                  event.target === event.currentTarget &&
+                  (event.key === "Enter" || event.key === " ")
+                ) {
+                  event.preventDefault();
+                  select(definition.id, instance.id);
+                }
+              }}
             >
-              {definition.render(instance.props)}
-            </div>
-            {data.canvas.instances.length > 1 && data.canvas.selectedId === instance.id ? (
-              <span aria-hidden="true" className="preview-selection">
-                Selected
-              </span>
-            ) : null}
-          </section>
-        ))}
+              <div
+                data-component-preview
+                data-component-id={definition.id}
+                data-instance-id={instance.id}
+                className="flex w-full min-w-0 items-center justify-center"
+              >
+                {definition.render(instance.props)}
+              </div>
+              {data.comparison ||
+              (count > 1 && data.id === definition.id && data.canvas.selectedId === instance.id) ? (
+                <span aria-hidden="true" className="preview-selection">
+                  {data.comparison
+                    ? `${definition.name}${canvas.instances.length > 1 ? ` ${index + 1}` : ""}${data.id === definition.id && data.canvas.selectedId === instance.id ? " · Selected" : ""}`
+                    : "Selected"}
+                </span>
+              ) : null}
+            </section>
+          )),
+        )}
       </main>
       <SpacingInspector
         enabled={data.inspectSpacing ?? false}
         scope={data.spacingScope ?? "Side"}
         theme={data.theme}
-        componentId={data.id}
+        contextId={groups.map((group) => group.id).join("|")}
         revision={data.canvas}
       />
     </>

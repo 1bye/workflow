@@ -62,7 +62,10 @@ export function isSpacingEdits(value: unknown): value is SpacingEdits {
     )
   );
 }
-export function spacingCSS(instances: { id: string; spacing?: SpacingEdits }[]) {
+export function spacingCSS(
+  instances: { id: string; spacing?: SpacingEdits }[],
+  componentId?: string,
+) {
   return instances
     .flatMap((instance) =>
       Object.entries(instance.spacing ?? {}).map(([path, edits]) => {
@@ -75,7 +78,7 @@ export function spacingCSS(instances: { id: string; spacing?: SpacingEdits }[]) 
           })
           .join(" > ");
 
-        return `[data-component-preview][data-instance-id="${instance.id}"] > ${selector}{${Object.entries(
+        return `[data-component-preview]${componentId === undefined ? "" : `[data-component-id="${componentId}"]`}[data-instance-id="${instance.id}"] > ${selector}{${Object.entries(
           edits,
         )
           .map(([property, value]) => `${property}:${value}px!important`)

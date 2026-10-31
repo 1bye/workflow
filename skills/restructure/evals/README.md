@@ -7,7 +7,8 @@ and records your own ratings so changes to `SKILL.md` can be compared over time.
 
 | Path | Purpose |
 | --- | --- |
-| `cases/<id>/input.md` | The raw AI reply, pasted as-is |
+| `cases/<id>/input.md` | Reformat mode: the raw AI reply, pasted as-is |
+| `cases/<id>/prompt.md` | Answer mode: a request the skill answers directly in its format |
 | `cases/<id>/facts.json` | Atomic facts; each `must` term (or one of its alternatives) has to appear in the output |
 | `cases/<id>/golden.md` | Optional output you rated highly; the judge uses it as a shape reference |
 | `rubric.md` | LLM judge prompt: fidelity, completeness, scannability, hierarchy, voice (1-5) |
@@ -21,6 +22,12 @@ and records your own ratings so changes to `SKILL.md` can be compared over time.
 kept, no invented numbers, code blocks verbatim, length 0.75-1.4x input, no 6-word run repeated, no
 block over 45 words, short bottom line first, has lists or headings, no
 preamble.
+
+Answer-mode cases have no source text, so they skip the four fidelity checks;
+their `facts.json` lists the key points a strong answer must contain. Every
+case also fails on a trailing sign-off ("Hope this helps").
+
+Runs send `/restructure <case text>` so the skill has to pick the mode itself.
 
 The automatic score catches loss. Only you and the judge can say whether the
 result reads well, so rate outputs.
@@ -50,3 +57,6 @@ When a real reply comes out badly, keep it: create `cases/<id>/input.md` with
 the raw text and list its facts in `facts.json`. Use exact values (`38fr`,
 `354px`) as terms and alternatives (`["text width", "text-width"]`) where
 wording can reasonably vary. Prefer 10-20 facts per case.
+
+For answer mode, put the question in `prompt.md` and list 5-10 points any good
+answer includes, with generous alternatives so phrasing doesn't fail a case.

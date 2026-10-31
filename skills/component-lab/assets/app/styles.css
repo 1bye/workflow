@@ -12,6 +12,12 @@
 }
 
 #controls { container: controls / inline-size; }
+[data-reset-menu] {
+  inset: auto;
+  position-area: bottom span-left;
+  position-try-fallbacks: flip-block, flip-inline;
+  margin: 4px 0 0;
+}
 #controls select option { color: var(--lab-text); background-color: var(--lab-panel); }
 @supports (appearance: base-select) {
   #controls select,

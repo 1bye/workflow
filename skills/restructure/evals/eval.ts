@@ -62,7 +62,17 @@ function repeats(input: string, output: string) {
   return [...counts(output)].filter(([key, n]) => n > Math.max(1, before.get(key) ?? 0)).map(([key]) => key);
 }
 
-export function score(caseId: string, input: string, output: string): Score {
+type Mode = "reformat" | "answer";
+
+/** A case is pasted text to reformat (`input.md`) or a request to answer (`prompt.md`). */
+function load(caseId: string): { mode: Mode; text: string } {
+  const prompt = join(casesDir, caseId, "prompt.md");
+  return existsSync(prompt)
+    ? { mode: "answer", text: readFileSync(prompt, "utf8") }
+    : { mode: "reformat", text: readFileSync(join(casesDir, caseId, "input.md"), "utf8") };
+}
+
+export function score(caseId: string, input: string, output: string, mode: Mode = "reformat"): Score {
   const { facts } = JSON.parse(readFileSync(join(casesDir, caseId, "facts.json"), "utf8")) as { facts: Fact[] };
   const out = normalize(output);
 
@@ -77,18 +87,24 @@ export function score(caseId: string, input: string, output: string): Score {
   const ratio = words(output) / words(input);
   const longest = longestBlock(output);
   const firstLine = output.trim().split("\n")[0] ?? "";
-  const repeated = repeats(input, output.trim().split("\n").slice(1).join("\n")); // the bottom line restates by design
+  const repeated = repeats(mode === "answer" ? "" : input, output.trim().split("\n").slice(1).join("\n")); // the bottom line restates by design
 
-  const checks: Check[] = [
+  // Answer mode has no source text, so only the shape checks apply.
+  const fidelity: Check[] = mode === "answer" ? [] : [
     { name: "numbers kept", pass: lostNumbers.length === 0, detail: lostNumbers.join(", ") || "all" },
     { name: "no new numbers", pass: newNumbers.length === 0, detail: newNumbers.join(", ") || "none" },
     { name: "code verbatim", pass: lostCode.length === 0, detail: `${lostCode.length} block(s) changed` },
     { name: "length 0.75-1.4x", pass: ratio >= 0.75 && ratio <= 1.4, detail: ratio.toFixed(2) },
+  ];
+
+  const checks: Check[] = [
+    ...fidelity,
     { name: "block <= 45 words", pass: longest <= 45, detail: `${longest}` },
     { name: "bottom line first", pass: words(firstLine) <= 45 && !firstLine.startsWith("#"), detail: `${words(firstLine)} words` },
     { name: "no repeated facts", pass: repeated.length === 0, detail: repeated.slice(0, 3).join(" | ") },
     { name: "has structure", pass: /^\s*(?:#+|[-*]|\d+\.|\|)\s/m.test(output), detail: "" },
     { name: "no preamble", pass: !/^(here('s| is)|sure|certainly|great question)/i.test(output.trim()), detail: "" },
+    { name: "no sign-off", pass: !/(hope (this|that) helps|let me know if)[^\n]*\s*$/i.test(output.trim().replace(/\n.*Dropped:.*$/, "")), detail: "" },
   ];
 
   const factScore = (facts.length - missing.length) / facts.length;
@@ -110,11 +126,11 @@ async function claude(prompt: string) {
   return text.trim();
 }
 
-async function judge(caseId: string, input: string, output: string) {
+async function judge(caseId: string, input: string, output: string, mode: Mode) {
   const rubric = readFileSync(join(root, "rubric.md"), "utf8");
   const golden = join(casesDir, caseId, "golden.md");
   const reference = existsSync(golden) ? `\n\n<golden>\n${readFileSync(golden, "utf8")}\n</golden>` : "";
-  const reply = await claude(`${rubric}\n\n<input>\n${input}\n</input>\n\n<output>\n${output}\n</output>${reference}`);
+  const reply = await claude(`${rubric}\n\n<${mode === "answer" ? "prompt" : "input"}>\n${input}\n</${mode === "answer" ? "prompt" : "input"}>\n\n<output>\n${output}\n</output>${reference}`);
 
   try {
     return JSON.parse(reply.slice(reply.indexOf("{"), reply.lastIndexOf("}") + 1)) as Record<string, unknown>;
@@ -124,7 +140,7 @@ async function judge(caseId: string, input: string, output: string) {
 }
 
 const skillHash = () => createHash("sha256").update(readFileSync(skillFile)).digest("hex").slice(0, 8);
-const caseIds = () => readdirSync(casesDir).filter((id) => existsSync(join(casesDir, id, "input.md"))).sort();
+const caseIds = () => readdirSync(casesDir).filter((id) => ["input.md", "prompt.md"].some((file) => existsSync(join(casesDir, id, file)))).sort();
 const flag = (args: string[], name: string) => args.includes(name);
 const option = (args: string[], name: string) => args[args.indexOf(name) + 1];
 
@@ -146,12 +162,13 @@ async function run(args: string[]) {
   mkdirSync(dir, { recursive: true });
 
   const scores = await Promise.all(ids.map(async (id) => {
-    const input = readFileSync(join(casesDir, id, "input.md"), "utf8");
-    const output = await claude(`${skill}\n\n---\n\nApply the skill above. Restructure this message:\n\n<message>\n${input}\n</message>`);
+    // Invoke the way a user would; the skill has to pick the mode itself.
+    const { mode, text } = load(id);
+    const output = await claude(`${skill}\n\n---\n\nThe user invoked the skill above with this message:\n\n/restructure ${text}`);
     writeFileSync(join(dir, `${id}.md`), `${output}\n`);
 
-    const result = score(id, input, output);
-    if (flag(args, "--judge")) result.judge = await judge(id, input, output);
+    const result = score(id, text, output, mode);
+    if (flag(args, "--judge")) result.judge = await judge(id, text, output, mode);
     return result;
   }));
 
@@ -192,7 +209,8 @@ if (import.meta.main) {
   if (command === "run") await run(args);
   else if (command === "score") {
     const [caseId, file] = args;
-    print([score(caseId!, readFileSync(join(casesDir, caseId!, "input.md"), "utf8"), readFileSync(file!, "utf8"))]);
+    const { mode, text } = load(caseId!);
+    print([score(caseId!, text, readFileSync(file!, "utf8"), mode)]);
   } else if (command === "rate") rate(args);
   else if (command === "report") report();
   else console.log("commands: run [--case id] [--judge] | score <case> <file> | rate <run> <case> <1-5> \"note\" [--golden] | report");

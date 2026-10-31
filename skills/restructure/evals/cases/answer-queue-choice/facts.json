@@ -1,0 +1,12 @@
+{
+  "source": "Answer mode: recommendation with options, trade-offs, and context-specific numbers",
+  "facts": [
+    { "id": "options", "must": ["BullMQ", ["pg-boss", "Graphile Worker"], "SQS"] },
+    { "id": "volume", "must": [["5k", "5,000", "5000"]] },
+    { "id": "no-new-infra", "must": [["no new infrastructure", "no extra infrastructure", "already run", "existing Postgres", "already have Postgres", "one less", "no Redis", "without Redis", "extra service", "new service", "another service"]] },
+    { "id": "transactional", "must": [["transaction", "transactional"]] },
+    { "id": "cron", "must": [["cron", "schedule", "nightly"]] },
+    { "id": "pdf-duration", "must": [["30s", "30 s", "30-second", "30 second"]] },
+    { "id": "retries", "must": [["retry", "retries"]] }
+  ]
+}

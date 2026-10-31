@@ -1,0 +1,12 @@
+{
+  "source": "Answer mode: debugging question with a known cause, a wrong fix to warn against, and a real fix",
+  "facts": [
+    { "id": "cause", "must": ["StrictMode"] },
+    { "id": "dev-only", "must": [["development", "dev mode", "dev-only", "dev only"], "production"] },
+    { "id": "mechanism", "must": [["mount", "remount", "unmount"]] },
+    { "id": "cleanup", "must": ["cleanup"] },
+    { "id": "abort", "must": [["AbortController", "abort", "ignore flag", "cancelled"]] },
+    { "id": "dont-remove", "must": [["don't remove", "do not remove", "not remove", "avoid removing", "keep StrictMode", "removing StrictMode"]] },
+    { "id": "idempotent", "must": [["idempotent", "idempotency", "dedupe", "deduplicate", "outside the effect", "event handler", "data-fetching library", "React Query", "TanStack"]] }
+  ]
+}

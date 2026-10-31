@@ -2,6 +2,7 @@ import type { BoundComponent } from "./index";
 
 export type ResolvedComponent = Omit<BoundComponent, "id" | "states"> & {
   id: string;
+  folder: string;
   states: { id: string; name: string; description: string }[];
 };
 export type Components = readonly [ResolvedComponent, ...ResolvedComponent[]];
@@ -39,6 +40,7 @@ export function resolveComponents(
       return {
         ...definition,
         id,
+        folder: source.split("/").slice(0, -2).join("/"),
         states: Object.entries(definition.states).map(([key, state]) => ({
           id: key,
           name: state.name ?? title(key),

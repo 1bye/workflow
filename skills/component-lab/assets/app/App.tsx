@@ -3,6 +3,9 @@ import Controls from "./Controls.tsx";
 import ResizeHandle from "./ResizeHandle.tsx";
 import usePanels from "./usePanels.ts";
 import ThemeSwitch from "./ThemeSwitch";
+import ResetMenu from "./ResetMenu";
+import ComponentBrowser from "./ComponentBrowser";
+import { toggleComparison } from "./library";
 import type { Theme } from "./theme";
 import { spacingScopes, type SpacingScope } from "./spacing-edits";
 import type { Components } from "../schema/entries";
@@ -53,7 +56,8 @@ export default function App({ initialTheme, components, initialSettings, storage
   const [inspecting, setInspecting] = useState(false);
   const [spacingScope, setSpacingScope] = useState<SpacingScope>("Side");
 
-  const [search, setSearch] = useState("");
+  const [comparisonIds, setComparisonIds] = useState<string[]>([]);
+  const [comparisonReturnId, setComparisonReturnId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [storageError, setStorageError] = useState(false);
   const [previewVersion, setPreviewVersion] = useState(0);
@@ -70,9 +74,12 @@ export default function App({ initialTheme, components, initialSettings, storage
   const instance = selectedInstance(canvas);
   const values = instance.props;
 
-  const filtered = components.filter((component) =>
-    component.name.toLowerCase().includes(search.toLowerCase()),
+  const compared = comparisonIds.filter((id) =>
+    components.some((component) => component.id === id),
   );
+
+  const comparing =
+    comparisonReturnId !== null && compared.length >= 2 && compared.includes(selected.id);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -103,7 +110,7 @@ export default function App({ initialTheme, components, initialSettings, storage
           const canvas = current.canvases[message.id];
 
           if (
-            current.id !== message.id ||
+            !(comparing ? compared.includes(message.id) : current.id === message.id) ||
             !canvas ||
             !canvas.instances.some((item) => item.id === message.instanceId)
           )
@@ -121,7 +128,7 @@ export default function App({ initialTheme, components, initialSettings, storage
                   },
           );
 
-          return replaceCanvas(current, message.id, next);
+          return { ...replaceCanvas(current, message.id, next), id: message.id };
         });
 
         return;
@@ -133,14 +140,23 @@ export default function App({ initialTheme, components, initialSettings, storage
         setWorkspace((current) => {
           const currentCanvas = current.canvases[message.id];
 
-          if (current.id !== message.id || !currentCanvas) return current;
+          if (
+            !(comparing ? compared.includes(message.id) : current.id === message.id) ||
+            !currentCanvas ||
+            !currentCanvas.instances.some((item) => item.id === message.instanceId)
+          )
+            return current;
 
           const next = selectInstance(currentCanvas, message.instanceId);
 
-          return next === currentCanvas ? current : replaceCanvas(current, message.id, next);
+          return next === currentCanvas && current.id === message.id
+            ? current
+            : { ...replaceCanvas(current, message.id, next), id: message.id };
         });
         setAction((current) =>
-          current?.id === message.id && current.instanceId !== message.instanceId ? null : current,
+          current && (current.id !== message.id || current.instanceId !== message.instanceId)
+            ? null
+            : current,
         );
 
         return;
@@ -170,7 +186,7 @@ export default function App({ initialTheme, components, initialSettings, storage
     window.addEventListener("message", receive);
 
     return () => window.removeEventListener("message", receive);
-  }, []);
+  }, [comparisonIds, comparing, components]);
   useEffect(() => {
     preview.current?.contentWindow?.postMessage(
       {
@@ -180,10 +196,35 @@ export default function App({ initialTheme, components, initialSettings, storage
         theme,
         inspectSpacing: inspecting,
         spacingScope,
+        ...(comparing
+          ? {
+              comparison: compared.map((id) => ({
+                id,
+                canvas:
+                  workspace.canvases[id] ??
+                  createCanvas(
+                    components
+                      .find((component) => component.id === id)!
+                      .parse(workspace.settings.components[id]),
+                  ),
+              })),
+            }
+          : {}),
       } satisfies RenderMessage,
       location.origin,
     );
-  }, [selected.id, canvas, theme, previewVersion, inspecting, spacingScope]);
+  }, [
+    selected.id,
+    canvas,
+    theme,
+    previewVersion,
+    inspecting,
+    spacingScope,
+    comparing,
+    comparisonIds,
+    workspace.canvases,
+    components,
+  ]);
   useEffect(() => {
     try {
       localStorage.setItem(
@@ -203,7 +244,7 @@ export default function App({ initialTheme, components, initialSettings, storage
 
   useEffect(() => {
     const exit = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setInspecting(false);
+      if (event.key === "Escape" && event.type === "keydown") setInspecting(false);
 
       preview.current?.contentWindow?.postMessage(
         { type: "spacing-modifier", alt: event.altKey, meta: event.metaKey },
@@ -250,6 +291,16 @@ export default function App({ initialTheme, components, initialSettings, storage
     );
   }
 
+  function endComparison() {
+    if (comparisonReturnId && components.some((component) => component.id === comparisonReturnId))
+      setWorkspace((current) => ({ ...current, id: comparisonReturnId }));
+
+    setComparisonReturnId(null);
+    setComparisonIds([]);
+    setAction(null);
+    setInspecting(false);
+  }
+
   function triggerAction(key: string) {
     if (action?.busy) return;
 
@@ -293,58 +344,49 @@ export default function App({ initialTheme, components, initialSettings, storage
           aria-label="Components and tweaks"
           className="grid min-h-0 min-w-0 grid-rows-[var(--library-height)_6px_minmax(0,1fr)] bg-(--lab-panel)"
         >
-          <section aria-label="Components" className="min-h-0 overflow-auto p-3">
-            <label className="flex items-center gap-[7px] rounded-[5px] border-0 bg-(--lab-surface) px-[9px] py-1.5 text-(--lab-faint)">
-              <span aria-hidden="true" className="text-[19px] leading-[15px]">
-                ⌕
-              </span>
-              <input
-                id="search"
-                aria-label="Find a component"
-                type="search"
-                placeholder={`Search ${components.length} component${components.length === 1 ? "" : "s"}…`}
-                className="min-w-0 w-full border-0 bg-transparent text-[10px] text-(--lab-text) placeholder:text-(--lab-faint)"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-              />
-            </label>
-            <div
-              id="component-list"
-              className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(85px,1fr))] gap-2"
-            >
-              {filtered.map((component) => (
-                <button
-                  key={component.id}
-                  type="button"
-                  data-id={component.id}
-                  aria-pressed={selected.id === component.id}
-                  className="flex min-w-0 flex-col items-stretch rounded-[7px] border-0 bg-(--lab-panel) p-[5px] text-left hover:bg-(--lab-control) aria-pressed:bg-(--lab-control)"
-                  onClick={() => {
-                    setWorkspace((current) => ({
-                      ...current,
-                      id: component.id,
-                    }));
-                    setInspecting(false);
-                    setAction(null);
-                  }}
-                >
-                  <img
-                    alt=""
-                    src={component.thumbnail}
-                    className="h-[62px] w-full rounded object-cover"
-                  />
-                  <span className="px-[3px] pt-[7px] pb-[3px] text-[10px] font-[550]">
-                    {component.name}
-                  </span>
-                </button>
-              ))}
-            </div>
-            {!filtered.length ? (
-              <p id="empty-search" className="mt-5 text-[11px] text-(--lab-faint)">
-                No matching components.
-              </p>
-            ) : null}
-          </section>
+          <ComponentBrowser
+            components={components}
+            selectedId={selected.id}
+            comparisonIds={compared}
+            comparing={comparing}
+            onSelect={(id) => {
+              setWorkspace((current) => ({ ...current, id }));
+
+              if (!comparing || !compared.includes(id)) {
+                setComparisonIds([]);
+                setComparisonReturnId(null);
+              }
+
+              setInspecting(false);
+              setAction(null);
+            }}
+            onToggle={(id) => {
+              const next = toggleComparison(compared, id, selected.id);
+
+              if (comparing && next.length < 2) {
+                endComparison();
+
+                return;
+              }
+
+              setComparisonIds(next);
+
+              if (comparing && !next.includes(selected.id))
+                setWorkspace((current) => ({ ...current, id: next[0]! }));
+            }}
+            onCompare={() => {
+              if (compared.length < 2) return;
+
+              if (!comparing) setComparisonReturnId(selected.id);
+
+              if (!compared.includes(selected.id))
+                setWorkspace((current) => ({ ...current, id: compared[0]! }));
+
+              setAction(null);
+              setInspecting(false);
+            }}
+            onClear={endComparison}
+          />
           <ResizeHandle
             orientation="horizontal"
             value={panels.sizes.height}
@@ -364,14 +406,16 @@ export default function App({ initialTheme, components, initialSettings, storage
                 >
                   <svg
                     aria-hidden="true"
-                    viewBox="0 0 16 16"
-                    className="size-3.5"
-                    fill="none"
+                    viewBox="0 0 24 24"
+                    className="size-4"
+                    fill="currentColor"
+                    fillOpacity=".08"
                     stroke="currentColor"
-                    strokeWidth="1.3"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
                     strokeLinejoin="round"
                   >
-                    <path d="m3 2 10 6-5 1-2 5Z" />
+                    <path d="M5.4 3.6c-.7-.4-1.5.2-1.3 1l3.4 14c.2.9 1.4 1 1.8.2l2.4-5 5.5-1.8c.9-.3 1-1.5.2-2L5.4 3.6Z" />
                   </svg>
                 </button>
                 {inspecting ? (
@@ -386,7 +430,7 @@ export default function App({ initialTheme, components, initialSettings, storage
                         type="button"
                         aria-pressed={spacingScope === scope}
                         onClick={() => setSpacingScope(scope)}
-                        className="h-5 rounded px-1.5 text-[9px] text-(--lab-faint) hover:text-(--lab-text) aria-pressed:bg-(--lab-active) aria-pressed:text-(--lab-text)"
+                        className="h-5 rounded px-1 text-[9px] text-(--lab-faint) hover:text-(--lab-text) aria-pressed:bg-(--lab-active) aria-pressed:text-(--lab-text)"
                       >
                         {scope}
                       </button>
@@ -394,30 +438,17 @@ export default function App({ initialTheme, components, initialSettings, storage
                   </div>
                 ) : null}
               </div>
-              {Object.keys(instance.spacing ?? {}).length ? (
-                <button
-                  type="button"
-                  aria-label="Reset spacing"
-                  className="h-6 rounded px-1 text-[9px] text-(--lab-faint) hover:bg-(--lab-control)"
-                  onClick={() =>
-                    modifyCanvas((current) => editSpacing(current, instance.id, () => ({})))
-                  }
-                >
-                  Reset spacing
-                </button>
-              ) : null}
-              <button
-                id="reset"
-                type="button"
-                className="h-6 rounded border-0 bg-transparent px-1.5 text-[10px] text-(--lab-muted) hover:bg-(--lab-control) hover:text-(--lab-text)"
-                onClick={() =>
+              <ResetMenu
+                hasSpacing={!!Object.keys(instance.spacing ?? {}).length}
+                onResetTweaks={() =>
                   modifyCanvas((current) =>
                     editInstance(current, instance.id, () => selected.parse({})),
                   )
                 }
-              >
-                Reset
-              </button>
+                onResetSpacing={() =>
+                  modifyCanvas((current) => editSpacing(current, instance.id, () => ({})))
+                }
+              />
               <ThemeSwitch theme={theme} onChange={setTheme} />
             </div>
             {inspecting ? (
@@ -463,7 +494,7 @@ export default function App({ initialTheme, components, initialSettings, storage
           onResize={(value) => panels.resize("width", value)}
         />
         <section
-          aria-label={`${selected.name} preview`}
+          aria-label={comparing ? "Component comparison" : `${selected.name} preview`}
           className="relative grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)]"
         >
           <iframe
@@ -484,6 +515,7 @@ export default function App({ initialTheme, components, initialSettings, storage
               aria-label={`Editing preview ${canvas.instances.findIndex((item) => item.id === instance.id) + 1} of ${canvas.instances.length}`}
               className="px-2 font-mono text-[10px] whitespace-nowrap text-(--lab-faint)"
             >
+              {comparing ? `${selected.name} · ` : ""}
               {canvas.instances.findIndex((item) => item.id === instance.id) + 1} /{" "}
               {canvas.instances.length}
             </span>
@@ -537,6 +569,16 @@ export default function App({ initialTheme, components, initialSettings, storage
                 <path d="M3 4.5h10M6 4.5V2.5h4v2M4.5 4.5l.5 9h6l.5-9M6.5 7v4M9.5 7v4" />
               </svg>
             </button>
+            {comparing ? (
+              <button
+                type="button"
+                aria-label="Exit comparison"
+                onClick={endComparison}
+                className="h-7 rounded px-2 text-[10px] whitespace-nowrap text-(--lab-muted) hover:bg-(--lab-control)"
+              >
+                Done
+              </button>
+            ) : null}
           </div>
           {error ? (
             <div

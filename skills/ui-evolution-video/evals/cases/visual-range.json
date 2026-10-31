@@ -1,0 +1,6 @@
+{
+  "prompt": "Show the workspace UI evolution from revisions.baseline to revisions.separated. Select meaningful visual milestones from this history and explain skipped revisions. Use the first-parent history.",
+  "start": "baseline",
+  "end": "separated",
+  "check": "selection"
+}
