@@ -1,0 +1,16 @@
+{
+  "source": "Synthetic ChatGPT-style recommendation: one dense paragraph, options, caveats, verification",
+  "facts": [
+    { "id": "no-status-index", "must": ["status", ["sequential scan", "seq scan"]] },
+    { "id": "status-cardinality", "must": ["pending", "paid", "refunded", "92%", "14 million"] },
+    { "id": "write-cost", "must": [["write throughput", "insert"]] },
+    { "id": "query-shape", "must": ["customer_id", "created_at DESC", "LIMIT 20"] },
+    { "id": "composite", "must": ["(customer_id, status, created_at DESC)"] },
+    { "id": "composite-effect", "must": ["hundred milliseconds", "single-digit"] },
+    { "id": "partial", "must": ["CREATE INDEX CONCURRENTLY orders_pending_idx ON orders (customer_id, created_at DESC) WHERE status = 'pending';"] },
+    { "id": "partial-size", "must": ["3%", ["memory", "hot"]] },
+    { "id": "partial-caveat", "must": ["$2", "literal"] },
+    { "id": "concurrently-lock", "must": ["SHARE lock", ["blocks writes", "block writes"], "minutes"] },
+    { "id": "verify", "must": ["EXPLAIN (ANALYZE, BUFFERS)", "Index Scan", "Bitmap Heap Scan"] }
+  ]
+}

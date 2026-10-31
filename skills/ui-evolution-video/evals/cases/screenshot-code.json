@@ -1,0 +1,5 @@
+{
+  "prompt": "Use before.png as the starting interface and after.html as the final interface. Rebuild editable elements from the screenshot, then create a restrained before/after morph. The screenshot is the only evidence for the starting state; do not inspect before.html or Git history.",
+  "end": "separated",
+  "check": "screenshot"
+}

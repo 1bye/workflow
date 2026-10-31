@@ -38,6 +38,7 @@ export const skillSources = {
   shadcn: "ts/skills/shadcn",
   "rust-development": "rust/skills/rust-development",
   atlas: "skills/atlas",
+  "component-lab": "skills/component-lab",
 } as const;
 
 export type Profile = keyof typeof profiles;

@@ -1,0 +1,14 @@
+{
+  "source": "Synthetic ChatGPT-style debugging explanation with a code fix and ordering gotchas",
+  "facts": [
+    { "id": "origins", "must": ["http://localhost:5173", "http://localhost:8080/api/upload"] },
+    { "id": "triggers", "must": ["credentials: 'include'", "Content-Type: application/json", "OPTIONS", "preflight"] },
+    { "id": "default-cors", "must": ["app.use(cors())", "Access-Control-Allow-Origin: *"] },
+    { "id": "spec-rule", "must": [["wildcard", "`*`"], "credentials"] },
+    { "id": "symptom", "must": ["Response to preflight request doesn't pass access control check", "204"] },
+    { "id": "origin-exact", "must": ["port", "trailing slash"] },
+    { "id": "ordering", "must": ["before", "auth", "401", "cookies"] },
+    { "id": "nginx", "must": ["Nginx", ["two values", "duplicate"]] },
+    { "id": "env", "must": ["CORS_ORIGIN"] }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "source": "ChatGPT reply explaining why a blind UI rebuild drifted from the original image",
+  "facts": [
+    { "id": "root-cause", "must": ["specification"] },
+    { "id": "tokens-mapping", "must": ["default text", "muted text", "footer"] },
+    { "id": "tokens-effect", "must": ["reasonable", "image"] },
+    { "id": "typography-props", "must": ["weight", "line height", "letter spacing"] },
+    { "id": "typography-effect", "must": ["system font", ["text width", "text-width"], "badge", "visual weight"] },
+    { "id": "geometry-cause", "must": ["full-track", "gap"] },
+    { "id": "geometry-effect", "must": ["38fr", "gray segment"] },
+    { "id": "geometry-fix", "must": ["segment bounds"] },
+    { "id": "logos-cause", "must": ["logo", "shape"] },
+    { "id": "logos-fix", "must": ["SVG", "README", "asset description"] },
+    { "id": "validation-numbers", "must": ["354px", "408px"] },
+    { "id": "validation-fix", "must": [["before reporting", "before completion", "before reporting completion"]] },
+    { "id": "wasted-brief", "must": ["task times", "hypothetical states", "static component"] },
+    { "id": "blind-test", "must": ["blind test", "handoff"] },
+    { "id": "appendix", "must": ["reconstruction appendix", "bounds", "typography", "color assignment", "alignment", "asset definition"] },
+    { "id": "appendix-checks", "must": [["explicit checks", "check against"]] }
+  ]
+}

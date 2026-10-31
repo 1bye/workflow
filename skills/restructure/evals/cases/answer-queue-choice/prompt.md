@@ -1,0 +1,1 @@
+We're a 4-person team on Postgres + Node. We need background jobs: sending emails, generating PDFs (up to ~30s each), and nightly syncs. Around 5k jobs/day. Should we use Redis with BullMQ, a Postgres-based queue like pg-boss or Graphile Worker, or a managed service like SQS? Recommend one.

@@ -1,0 +1,6 @@
+{
+  "prompt": "Animate the workspace settings screen from revisions.aligned to revisions.separated in the fixture repository. Preserve the identity of the existing controls while the layout reorganizes. Deliver a video, editable project, and provenance.",
+  "start": "aligned",
+  "end": "separated",
+  "check": "reparent"
+}

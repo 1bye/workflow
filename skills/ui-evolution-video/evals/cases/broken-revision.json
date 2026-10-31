@@ -1,0 +1,6 @@
+{
+  "prompt": "Animate the workspace screen from revisions.broken to revisions.separated. Use a two-second troubleshooting budget for the old revision and retain enough provenance to explain how each endpoint was obtained.",
+  "start": "broken",
+  "end": "separated",
+  "check": "fallback"
+}

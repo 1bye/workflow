@@ -1,0 +1,38 @@
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+  --lab-bg: #f5f5f5;
+  --lab-panel: #ffffff;
+  --lab-surface: #fafafa;
+  --lab-control: #eeeeee;
+  --lab-fill: #d8d8d8;
+  --lab-active: #ffffff;
+  --lab-text: #292929;
+  --lab-muted: #5c5c5c;
+  --lab-faint: #6b6b6b;
+  --lab-border: #dedede;
+  --lab-focus: #858585;
+  --lab-shadow: #0000000f;
+  --lab-error-bg: #fff5f5;
+  --lab-error-text: #a13535;
+  --lab-error-border: #e7bcbc;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --lab-bg: #141414;
+  --lab-panel: #1c1c1c;
+  --lab-surface: #202020;
+  --lab-control: #292929;
+  --lab-fill: #404040;
+  --lab-active: #484848;
+  --lab-text: #e5e5e5;
+  --lab-muted: #b5b5b5;
+  --lab-faint: #9a9a9a;
+  --lab-border: #353535;
+  --lab-focus: #aaaaaa;
+  --lab-shadow: #00000033;
+  --lab-error-bg: #321f1f;
+  --lab-error-text: #f0adad;
+  --lab-error-border: #704242;
+}

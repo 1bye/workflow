@@ -1,0 +1,4 @@
+interface:
+  display_name: "UI Evolution Video"
+  short_description: "Animate UI redesigns from commits or two sources"
+  default_prompt: "Use $ui-evolution-video to turn these UI versions into a polished before/after animation."
