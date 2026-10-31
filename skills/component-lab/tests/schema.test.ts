@@ -78,3 +78,27 @@ test("invalid control configuration and invalid snapshot props fail at schema cr
     /Invalid prop/,
   );
 });
+
+test("preview minimum width stays metadata through binding and discovery and rejects invalid dimensions", () => {
+  const definition = Schema.Component("Wide preview", {
+    preview: { minWidth: 320 },
+    controls: { size: Schema.Control.Number({ default: 44 }) },
+  });
+
+  const bound = definition.from(() => null);
+  const resolved = resolveComponents({ "@drafts/components/wide/index.ts": { default: bound } });
+
+  assert.deepEqual(resolved[0].preview, { minWidth: 320 });
+  assert.deepEqual(bound.render({}).props, { size: 44 });
+  assert.deepEqual(definition.defaults, { size: 44 });
+  assert.doesNotThrow(() =>
+    Schema.Component("No minimum", { preview: { minWidth: 0 }, controls: {} }),
+  );
+
+  for (const minWidth of [-1, NaN, Infinity]) {
+    assert.throws(
+      () => Schema.Component("Invalid preview", { preview: { minWidth }, controls: {} }),
+      /Preview minimum width/,
+    );
+  }
+});

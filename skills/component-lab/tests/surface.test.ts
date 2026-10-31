@@ -4,6 +4,7 @@ import * as Schema from "../assets/schema/index.ts";
 import { MAX_GRADIENT_STOPS } from "../assets/schema/values.ts";
 import { validateSettings } from "../assets/settings.ts";
 import { isRenderMessage } from "../assets/app/types.ts";
+import { canvasMessage } from "./messages.ts";
 
 const gradient: Schema.Gradient = {
   angle: 135,
@@ -121,10 +122,7 @@ test("nested surface values survive storage and preview messages while malformed
   );
 
   assert.deepEqual(settings.components.demo, schema.defaults);
-  assert.equal(
-    isRenderMessage({ type: "render", id: "demo", props: settings.components.demo, theme: "dark" }),
-    true,
-  );
+  assert.equal(isRenderMessage(canvasMessage(settings.components.demo)), true);
 
   for (const invalid of [
     { ...gradient, stops: new Array<unknown>(2) },
@@ -137,10 +135,7 @@ test("nested surface values survive storage and preview messages while malformed
       () => validateSettings({ version: 1, components: { demo: { value: invalid } } }),
       /Invalid component settings/,
     );
-    assert.equal(
-      isRenderMessage({ type: "render", id: "demo", props: { value: invalid }, theme: "light" }),
-      false,
-    );
+    assert.equal(isRenderMessage(canvasMessage({ value: invalid }, "light")), false);
   }
 });
 

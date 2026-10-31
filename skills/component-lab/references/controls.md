@@ -110,10 +110,9 @@ The picker supports PNG, JPEG, WebP, GIF, and SVG files up to 256 KB, embeds the
 in browser storage, and provides a thumbnail and clear button. Use project paths
 for larger images. Remote image URLs are not supported by the local workbench.
 
-Action runs its callback inside the preview once per visible component state.
-`element` is that state's preview wrapper. Returning a promise keeps the button
-busy until completion; failures appear inline. Actions run only when clicked,
-never on reload, and cannot be state snapshot overrides.
+Action runs its callback inside the selected preview instance. `element` is that
+instance's preview wrapper. Returning a promise keeps the button busy until
+completion; failures appear inline. Actions run only when clicked, never on reload.
 
 See the complete [controls demo](../assets/workspace/components/controls-demo/controls.schema.ts)
 and its [React implementation](../assets/workspace/components/controls-demo/ControlsDemo.tsx).

@@ -2,7 +2,6 @@ import { createRoot } from "react-dom/client";
 import components from "./components";
 import App from "./App";
 import { validateSettings } from "../settings";
-import { restoreWorkspace } from "./state";
 import { resolveTheme } from "./theme";
 import "./styles.css";
 
@@ -31,22 +30,12 @@ try {
   if (!workspaceId) throw new Error("Restart Component Lab to enable automatic workspace storage.");
 
   const storageKey = `component-lab-workspace-v1-${workspaceId}`;
-  let pending: unknown;
-
-  try {
-    pending = JSON.parse(localStorage.getItem(storageKey) ?? "null");
-  } catch {
-    /* Browser storage is optional. */
-  }
-
-  const initial = restoreWorkspace(pending, persisted, components);
 
   root.render(
     <App
       initialTheme={initialTheme}
       components={components}
-      initialSettings={initial.settings}
-      initialId={initial.id}
+      initialSettings={persisted}
       storageKey={storageKey}
     />,
   );

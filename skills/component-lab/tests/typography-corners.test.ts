@@ -3,6 +3,7 @@ import { test } from "node:test";
 import * as Schema from "../assets/schema/index.ts";
 import { validateSettings } from "../assets/settings.ts";
 import { isRenderMessage } from "../assets/app/types.ts";
+import { canvasMessage } from "./messages.ts";
 
 const typography: Schema.Typography = {
   fontFamily: "system-ui",
@@ -104,10 +105,7 @@ test("typography and corner props bind, serialize, and cross the preview boundar
   );
 
   assert.deepEqual(settings.components.demo, schema.defaults);
-  assert.equal(
-    isRenderMessage({ type: "render", id: "demo", props: settings.components.demo, theme: "dark" }),
-    true,
-  );
+  assert.equal(isRenderMessage(canvasMessage(settings.components.demo)), true);
   assert.deepEqual(schema.from(() => null).render({}, "serif").props, {
     ...schema.defaults,
     ...schema.states.serif!.props,
@@ -124,10 +122,7 @@ test("typography and corner props bind, serialize, and cross the preview boundar
       () => validateSettings({ version: 1, components: { demo: { value } } }),
       /Invalid component settings/,
     );
-    assert.equal(
-      isRenderMessage({ type: "render", id: "demo", props: { value }, theme: "light" }),
-      false,
-    );
+    assert.equal(isRenderMessage(canvasMessage({ value }, "light")), false);
   }
 });
 

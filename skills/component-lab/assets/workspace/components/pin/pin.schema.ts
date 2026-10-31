@@ -16,7 +16,6 @@ const pin = Schema.Component("Location pin", {
     showLabel: Schema.Control.Boolean({ label: "Show label", default: true }),
     variant: Schema.Control.Select(["default", "hover", "selected", "disabled", "loading"], {
       default: "default",
-      hidden: true,
     }),
   },
   states: {

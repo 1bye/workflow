@@ -2,6 +2,7 @@ import { createElement } from "react";
 import * as Schema from "../assets/schema/index";
 
 const schema = Schema.Component("Typed example", {
+  preview: { minWidth: 320 },
   controls: {
     size: Schema.Control.Number({ default: 44 }),
     color: Schema.Control.Color({ default: "#668977" }),
@@ -82,6 +83,11 @@ export function acceptedBinding() {
 }
 
 export function rejectedExamples() {
+  Schema.Component("Wrong preview width", {
+    // @ts-expect-error Preview minimum width uses a number of CSS pixels.
+    preview: { minWidth: "320px" },
+    controls: {},
+  });
   // @ts-expect-error Asset sources must be strings.
   Schema.Control.Asset({ default: 123 });
   // @ts-expect-error Action callbacks are required.

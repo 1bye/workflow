@@ -5,6 +5,7 @@ import { isAssetSource, MAX_ASSET_BYTES } from "../assets/schema/asset.ts";
 import { runAction } from "../assets/app/actions.ts";
 import { isActionMessage, isActionResult, isRenderMessage } from "../assets/app/types.ts";
 import { validateSettings } from "../assets/settings.ts";
+import { canvasMessage } from "./messages.ts";
 
 test("assets accept local and embedded images and normalize unsupported sources", () => {
   const schema = Schema.Component("Asset", {
@@ -23,7 +24,7 @@ test("assets accept local and embedded images and normalize unsupported sources"
     const props = schema.parse({ image: source });
 
     assert.equal(props.image, source);
-    assert.equal(isRenderMessage({ type: "render", id: "demo", props, theme: "dark" }), true);
+    assert.equal(isRenderMessage(canvasMessage(props)), true);
     assert.deepEqual(
       validateSettings(JSON.parse(JSON.stringify({ version: 1, components: { demo: props } })))
         .components.demo,
@@ -106,11 +107,33 @@ test("actions invoke each visible specimen, await callbacks, and report failures
 
 test("preview action messages validate identifiers and response errors", () => {
   assert.equal(
-    isActionMessage({ type: "action", id: "demo", key: "replay", requestId: "one" }),
+    isActionMessage({
+      type: "action",
+      id: "demo",
+      instanceId: "initial",
+      key: "replay",
+      requestId: "one",
+    }),
     true,
   );
-  assert.equal(isActionMessage({ type: "action", id: "demo", key: 1, requestId: "one" }), false);
-  assert.equal(isActionMessage({ type: "action", id: "demo", key: "replay" }), false);
+  assert.equal(
+    isActionMessage({
+      type: "action",
+      id: "demo",
+      instanceId: "initial",
+      key: 1,
+      requestId: "one",
+    }),
+    false,
+  );
+  assert.equal(
+    isActionMessage({ type: "action", id: "demo", instanceId: "initial", key: "replay" }),
+    false,
+  );
+  assert.equal(
+    isActionMessage({ type: "action", id: "demo", key: "replay", requestId: "one" }),
+    false,
+  );
   assert.equal(isActionResult({ type: "action-result", requestId: "one", error: null }), true);
   assert.equal(isActionResult({ type: "action-result", requestId: "one", error: "Failed" }), true);
   assert.equal(isActionResult({ type: "action-result", requestId: "one", error: {} }), false);

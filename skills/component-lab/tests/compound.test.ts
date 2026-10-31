@@ -3,6 +3,7 @@ import { test } from "node:test";
 import * as Schema from "../assets/schema/index.ts";
 import { validateSettings } from "../assets/settings.ts";
 import { isRenderMessage } from "../assets/app/types.ts";
+import { canvasMessage } from "./messages.ts";
 
 const schema = Schema.Component("Compound values", {
   controls: {
@@ -81,10 +82,7 @@ test("compound settings survive JSON storage and iframe validation rejects unsup
   );
 
   assert.deepEqual(validateSettings(serialized).components.demo, schema.defaults);
-  assert.equal(
-    isRenderMessage({ type: "render", id: "demo", props: schema.defaults, theme: "dark" }),
-    true,
-  );
+  assert.equal(isRenderMessage(canvasMessage(schema.defaults)), true);
 
   for (const invalid of [
     { x: 0, y: Infinity },
@@ -98,10 +96,7 @@ test("compound settings survive JSON storage and iframe validation rejects unsup
       () => validateSettings({ version: 1, components: { demo: { value: invalid } } }),
       /Invalid component settings/,
     );
-    assert.equal(
-      isRenderMessage({ type: "render", id: "demo", props: { value: invalid }, theme: "light" }),
-      false,
-    );
+    assert.equal(isRenderMessage(canvasMessage({ value: invalid }, "light")), false);
   }
 });
 

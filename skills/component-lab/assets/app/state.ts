@@ -1,8 +1,30 @@
 import type { PanelBounds, PanelSizes } from "./types";
 import type { Components } from "../schema/entries";
 import { isRecord, validateSettings, type Settings } from "../settings";
+import { isComponentId } from "../schema/entries";
+import { createCanvas, isCanvas, selectedInstance, type Canvas, type Canvases } from "./canvas";
 
-export function restoreWorkspace(pending: unknown, persisted: Settings, components: Components) {
+export type Workspace = { settings: Settings; id: string; canvases: Canvases };
+
+export function replaceCanvas(workspace: Workspace, id: string, canvas: Canvas): Workspace {
+  return {
+    ...workspace,
+    canvases: { ...workspace.canvases, [id]: canvas },
+    settings: {
+      ...workspace.settings,
+      components: {
+        ...workspace.settings.components,
+        [id]: selectedInstance(canvas).props,
+      },
+    },
+  };
+}
+
+export function restoreWorkspace(
+  pending: unknown,
+  persisted: Settings,
+  components: Components,
+): Workspace {
   const normalize = (settings: Settings): Settings => ({
     ...settings,
     components: {
@@ -16,30 +38,58 @@ export function restoreWorkspace(pending: unknown, persisted: Settings, componen
     },
   });
 
-  const settings = normalize(persisted);
-
-  const result = {
-    settings,
-    id: components[0].id,
-  };
+  let settings = normalize(persisted);
+  let id = components[0].id;
+  let savedCanvases: unknown;
 
   try {
     if (isRecord(pending) && typeof pending.selectedId === "string") {
       const stored = validateSettings(pending.settings);
 
-      return {
-        settings: normalize({
-          ...stored,
-          components: { ...persisted.components, ...stored.components },
-        }),
-        id: components.some(({ id }) => id === pending.selectedId) ? pending.selectedId : result.id,
-      };
+      settings = normalize({
+        ...stored,
+        components: { ...persisted.components, ...stored.components },
+      });
+      id = components.some(({ id }) => id === pending.selectedId) ? pending.selectedId : id;
+
+      if (pending.version === 2) savedCanvases = pending.canvases;
     }
   } catch {
     /* Ignore corrupt browser data while keeping the project defaults. */
   }
 
-  return result;
+  const canvases: Canvases = {};
+
+  if (isRecord(savedCanvases)) {
+    for (const [key, canvas] of Object.entries(savedCanvases)) {
+      if (isComponentId(key) && isCanvas(canvas))
+        canvases[key] = {
+          selectedId: canvas.selectedId,
+          instances: canvas.instances.map(({ id, props, spacing }) =>
+            spacing ? { id, props, spacing } : { id, props },
+          ),
+        };
+    }
+  }
+
+  for (const component of components) {
+    const saved = canvases[component.id];
+
+    const canvas = saved
+      ? {
+          ...saved,
+          instances: saved.instances.map((instance) => ({
+            ...instance,
+            props: component.parse(instance.props),
+          })),
+        }
+      : createCanvas(settings.components[component.id]!);
+
+    canvases[component.id] = canvas;
+    settings.components[component.id] = selectedInstance(canvas).props;
+  }
+
+  return { settings, id, canvases };
 }
 
 export function panelBounds(width: number, height: number): PanelBounds {

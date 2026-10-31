@@ -18,6 +18,7 @@ export type {
 } from "./values";
 export { gradientCSS, shadowCSS, cornersCSS } from "./styles";
 export type Presentation = { label?: string; hidden?: boolean };
+export type PreviewOptions = { minWidth?: number };
 export type NumberControl = Presentation & {
   type: "number";
   default: number;
@@ -189,11 +190,12 @@ export type BoundComponent = {
   id?: string;
   name: string;
   thumbnail?: string;
+  preview?: PreviewOptions;
   controls: ControlMap;
   defaults: Values;
   states: Record<string, State<Values>>;
   parse: (input: unknown) => Values;
-  render: (input: unknown, state: string) => ReactElement;
+  render: (input: unknown, state?: string) => ReactElement;
 };
 
 export function Component<const C extends ControlMap>(
@@ -201,11 +203,17 @@ export function Component<const C extends ControlMap>(
   options: {
     id?: string;
     thumbnail?: string;
+    preview?: PreviewOptions;
     controls: C;
     states?: Record<string, State<NoInfer<ControlProps<C>>>>;
   },
 ) {
   if (!name.trim()) throw new Error("A component needs a name.");
+
+  const minWidth = options.preview?.minWidth;
+
+  if (minWidth !== undefined && (!Number.isFinite(minWidth) || minWidth < 0))
+    throw new Error("Preview minimum width must be a finite, non-negative number.");
 
   const defaults = Object.fromEntries(
     Object.entries(options.controls)
@@ -254,6 +262,8 @@ export function Component<const C extends ControlMap>(
         states,
         parse,
         render(input, state) {
+          if (state === undefined) return createElement(component, parse(input));
+
           const snapshot = states[state];
 
           if (!snapshot) throw new Error(`Unknown state "${state}" for ${name}.`);

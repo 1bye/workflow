@@ -22,7 +22,8 @@ On first use the launcher creates:
 <project-dir>/.component-lab/
 ├── components/
 │   ├── pin/
-│   └── controls-demo/
+│   ├── controls-demo/
+│   └── …
 ├── tsconfig.json
 └── settings.json
 ```
@@ -39,8 +40,11 @@ timeline support remain deferred.
 
 ## Persistence
 
-`settings.json` supplies starting values. Control values and component selection
-autosave in browser local storage, separately for each project. Interface theme
+`settings.json` supplies starting values. Each component starts with one centered
+preview. Duplicate/remove buttons manage copies, and clicking an instance selects
+its controls. Control values, spacing edits, instances, and selection autosave in browser local
+storage, separately for each project. Existing saved tweaks migrate into the first
+instance. Interface theme
 and panel sizes are also remembered. Autosave does not rewrite component source
 or `settings.json`; transfer chosen values into source defaults when needed.
 Action callbacks and clicks are excluded from saved settings.

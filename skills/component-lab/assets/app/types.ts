@@ -1,12 +1,20 @@
-import type { Value, Values } from "../schema/index";
-import { isRecord, isValues } from "../settings";
+import {
+  isSpacingPath,
+  isSpacingProperty,
+  isSpacingValue,
+  type SpacingProperty,
+} from "./spacing-edits";
+import type { Value } from "../schema/index";
+import { isRecord } from "../settings";
 import { isTheme, type Theme } from "./theme";
+import { isCanvas, isInstanceId, type Canvas } from "./canvas";
 
 export type RenderMessage = {
   type: "render";
   id: string;
-  props: Values;
+  canvas: Canvas;
   theme: Theme;
+  inspectSpacing?: boolean;
 };
 
 export function isRenderMessage(value: unknown): value is RenderMessage {
@@ -14,19 +22,31 @@ export function isRenderMessage(value: unknown): value is RenderMessage {
     isRecord(value) &&
     value.type === "render" &&
     typeof value.id === "string" &&
-    isValues(value.props) &&
-    isTheme(value.theme)
+    isCanvas(value.canvas) &&
+    isTheme(value.theme) &&
+    (value.inspectSpacing === undefined || typeof value.inspectSpacing === "boolean")
   );
 }
 
-export type ActionMessage = { type: "action"; id: string; key: string; requestId: string };
-export type ActionResult = { type: "action-result"; requestId: string; error: string | null };
+export type ActionMessage = {
+  type: "action";
+  id: string;
+  instanceId: string;
+  key: string;
+  requestId: string;
+};
+export type ActionResult = {
+  type: "action-result";
+  requestId: string;
+  error: string | null;
+};
 
 export function isActionMessage(value: unknown): value is ActionMessage {
   return (
     isRecord(value) &&
     value.type === "action" &&
     typeof value.id === "string" &&
+    isInstanceId(value.instanceId) &&
     typeof value.key === "string" &&
     typeof value.requestId === "string"
   );
@@ -43,12 +63,47 @@ export function isActionResult(value: unknown): value is ActionResult {
 
 export type ActionStatus = {
   id: string;
+  instanceId: string;
   key: string;
   requestId: string;
   busy: boolean;
   error: string | null;
 };
 
+export type SelectInstanceMessage = {
+  type: "select-instance";
+  id: string;
+  instanceId: string;
+};
+export function isSelectInstanceMessage(value: unknown): value is SelectInstanceMessage {
+  return (
+    isRecord(value) &&
+    value.type === "select-instance" &&
+    typeof value.id === "string" &&
+    isInstanceId(value.instanceId)
+  );
+}
+
 export type ChangeControl = (key: string, value: Value) => void;
 export type PanelSizes = { width: number; height: number };
 export type PanelBounds = Record<keyof PanelSizes, { min: number; max: number }>;
+
+export type SpacingMessage = {
+  type: "spacing-change";
+  id: string;
+  instanceId: string;
+  path: string;
+  property: SpacingProperty;
+  value: number;
+};
+export function isSpacingMessage(value: unknown): value is SpacingMessage {
+  return (
+    isRecord(value) &&
+    value.type === "spacing-change" &&
+    typeof value.id === "string" &&
+    isInstanceId(value.instanceId) &&
+    isSpacingPath(value.path) &&
+    isSpacingProperty(value.property) &&
+    isSpacingValue(value.property, value.value)
+  );
+}

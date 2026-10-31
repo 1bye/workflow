@@ -1,9 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { createRoot } from "react-dom/client";
 import components from "./components";
-import { isActionMessage, isRenderMessage, type ActionResult, type RenderMessage } from "./types";
+import {
+  isActionMessage,
+  isRenderMessage,
+  type ActionResult,
+  type RenderMessage,
+  type SelectInstanceMessage,
+} from "./types";
 import { runAction } from "./actions";
 import "./preview.css";
+import { spacingCSS } from "./spacing-edits";
+import SpacingInspector from "./SpacingInspector";
 
 function Preview() {
   const [data, setData] = useState<RenderMessage | null>(null);
@@ -36,20 +44,24 @@ function Preview() {
       try {
         const definition = components.find((component) => component.id === data?.id);
 
-        if (!definition || definition.id !== message.id)
+        const element = Array.from(
+          document.querySelectorAll<HTMLElement>("[data-component-preview]"),
+        ).find((item) => item.dataset.instanceId === message.instanceId);
+
+        if (!definition || definition.id !== message.id || !element)
           throw new Error("The preview is not ready.");
 
-        await runAction(
-          definition.controls,
-          message.key,
-          Array.from(document.querySelectorAll<HTMLElement>("[data-component-preview]")),
-        );
+        await runAction(definition.controls, message.key, [element]);
       } catch (caught) {
         error = caught instanceof Error ? caught.message : String(caught);
       }
 
       parent.postMessage(
-        { type: "action-result", requestId: message.requestId, error } satisfies ActionResult,
+        {
+          type: "action-result",
+          requestId: message.requestId,
+          error,
+        } satisfies ActionResult,
         location.origin,
       );
     };
@@ -65,68 +77,88 @@ function Preview() {
 
   if (!definition) throw new Error(`Unknown component: ${data.id}`);
 
+  function select(instanceId: string) {
+    if (!data || data.canvas.selectedId === instanceId) return;
+
+    parent.postMessage(
+      {
+        type: "select-instance",
+        id: data.id,
+        instanceId,
+      } satisfies SelectInstanceMessage,
+      location.origin,
+    );
+  }
+
   return (
-    <div data-theme={data.theme} className="min-h-dvh bg-(--lab-bg) p-3 text-(--lab-text)">
-      <div className="mx-auto mb-3 flex max-w-[1120px] items-center justify-between gap-3">
-        <div>
-          <span className="text-[9px] font-semibold tracking-[1.8px] text-(--lab-faint) max-[460px]:text-[8px]">
-            THE STATE BOARD
-          </span>
-          <p className="mt-1.5 text-base font-[450] tracking-[-.4px] text-(--lab-muted) max-[460px]:text-[13px]">
-            One component. Every little moment.
-          </p>
-        </div>
-        <span className="text-[10px] text-(--lab-faint) max-[800px]:hidden">
-          Changes appear together{" "}
-          <span aria-hidden="true" className="ml-2 text-[18px]">
-            ↙
-          </span>
-        </span>
-      </div>
+    <>
+      <style>{spacingCSS(data.canvas.instances)}</style>
       <main
-        id="specimens"
-        data-count={definition.states.length}
-        className="specimens mx-auto grid max-w-[1120px] grid-cols-6 gap-3 max-[800px]:grid-cols-2 max-[460px]:grid-cols-1"
-        aria-label="Component states"
+        id="preview-canvas"
+        aria-label={`${definition.name} canvas`}
+        data-theme={data.theme}
+        data-inspecting={data.inspectSpacing ?? false}
+        data-multiple={data.canvas.instances.length > 1}
+        className="preview-canvas bg-(--lab-bg) text-(--lab-text)"
       >
-        {definition.states.map((state, index) => (
+        {data.canvas.instances.map((instance, index) => (
           <section
-            key={state.id}
-            data-state={state.id}
-            aria-label={`${definition.name}: ${state.name}`}
-            className="specimen col-span-2 min-w-0 overflow-hidden rounded-[10px] border border-(--lab-border) bg-(--lab-surface) max-[800px]:col-span-1"
+            key={`${definition.id}:${instance.id}`}
+            data-instance={instance.id}
+            data-selected={data.canvas.selectedId === instance.id}
+            aria-label={`${definition.name} preview ${index + 1}`}
+            aria-current={data.canvas.selectedId === instance.id ? "true" : undefined}
+            tabIndex={data.canvas.instances.length > 1 ? 0 : -1}
+            className="preview-instance"
+            style={
+              {
+                "--preview-min-width": `${definition.preview?.minWidth ?? 0}px`,
+              } as CSSProperties
+            }
+            onPointerDownCapture={() => select(instance.id)}
+            onFocusCapture={() => select(instance.id)}
+            onKeyDown={(event) => {
+              if (
+                event.target === event.currentTarget &&
+                (event.key === "Enter" || event.key === " ")
+              ) {
+                event.preventDefault();
+                select(instance.id);
+              }
+            }}
           >
-            <header className="flex items-center gap-2 px-3 py-2">
-              <span className="font-mono text-[9px] text-(--lab-faint)">
-                {String(index + 1).padStart(2, "0")}
-              </span>
-              <h2 className="text-[10px] font-[550] text-(--lab-muted)">{state.name}</h2>
-            </header>
             <div
               data-component-preview
-              className="flex min-h-[136px] items-center justify-center px-3 py-2 max-[460px]:min-h-[180px]"
+              data-instance-id={instance.id}
+              className="flex w-full min-w-0 items-center justify-center"
             >
-              {definition.render(data.props, state.id)}
+              {definition.render(instance.props)}
             </div>
-            <p className="px-2 pt-2 pb-2.5 text-center text-[9px] text-(--lab-faint)">
-              {state.description}
-            </p>
+            {data.canvas.instances.length > 1 && data.canvas.selectedId === instance.id ? (
+              <span aria-hidden="true" className="preview-selection">
+                Selected
+              </span>
+            ) : null}
           </section>
         ))}
       </main>
-      <footer className="mx-auto mt-3 flex max-w-[340px] items-center gap-3 text-[9px] whitespace-nowrap text-(--lab-faint) max-[460px]:gap-2 max-[460px]:text-[8px]">
-        <span className="h-px flex-1 bg-(--lab-border)" />
-        <span>A little room to try things.</span>
-        <span className="h-px flex-1 bg-(--lab-border)" />
-      </footer>
-    </div>
+      <SpacingInspector
+        enabled={data.inspectSpacing ?? false}
+        theme={data.theme}
+        componentId={data.id}
+        revision={data.canvas}
+      />
+    </>
   );
 }
 
 createRoot(document.getElementById("root")!, {
   onUncaughtError: (error) =>
     parent.postMessage(
-      { type: "error", message: error instanceof Error ? error.message : String(error) },
+      {
+        type: "error",
+        message: error instanceof Error ? error.message : String(error),
+      },
       location.origin,
     ),
 }).render(<Preview />);
