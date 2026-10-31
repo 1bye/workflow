@@ -82,10 +82,23 @@ starts fresh. Reset and Action target the selected instance. Canvas layout and
 selection belong to the workbench, so do not add them as component controls.
 The cursor button enables a spacing inspector. Hover a rendered element
 to preview its margin in orange, padding in green, and CSS flex/grid gaps in purple.
-The overlay follows the cursor without selecting layers. With the cursor over a
-colored spacing region, two-finger vertical scrolling adjusts that exact CSS property:
+The overlay follows the cursor without selecting layers. Spacing targets extend
+10 pixels beyond their visible regions, so thin and zero values are easy to reach.
+Near an edge, one compact handle shows the padding value, including zero. Hold
+Option/Alt to target zero margins or resolve overlapping edges. Visible margin
+regions target margins directly without a modifier. A gap handle appears between adjacent flex
+or grid children even when the gap is zero. Only the nearest handle is shown;
+internal gap boundaries take priority over overlapping child edges. With the cursor over a
+colored spacing region or its handle, two-finger vertical scrolling adjusts that exact CSS property:
 scroll up to increase, down to decrease; hold Shift for finer adjustments. Padding
-and gaps stop at zero; margins may be negative. The gesture keeps its target while
+and gaps stop at zero; margins may be negative. The compact Side / X / Y / All
+selector controls which padding or margin sides change on the hovered element.
+X changes left/right, Y changes top/bottom, and All changes all four sides. Hold
+Command to temporarily use All; releasing it restores the selected scope. Gaps
+keep their individual row or column axis. Affected sides are highlighted before
+scrolling, including zero edges. Group changes use the same delta on every side,
+preserve asymmetric spacing, and stop together when one side reaches a limit.
+The gesture keeps its target while
 the layout moves and releases it when the pointer moves away. Pinch-to-zoom and
 horizontal scrolling retain their normal behavior. Outside spacing regions, scrolling
 remains normal.

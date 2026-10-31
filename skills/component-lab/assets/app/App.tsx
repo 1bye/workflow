@@ -4,6 +4,7 @@ import ResizeHandle from "./ResizeHandle.tsx";
 import usePanels from "./usePanels.ts";
 import ThemeSwitch from "./ThemeSwitch";
 import type { Theme } from "./theme";
+import { spacingScopes, type SpacingScope } from "./spacing-edits";
 import type { Components } from "../schema/entries";
 import type { Value } from "../schema/index";
 import { isRecord, type Settings } from "../settings";
@@ -50,6 +51,7 @@ export default function App({ initialTheme, components, initialSettings, storage
   });
 
   const [inspecting, setInspecting] = useState(false);
+  const [spacingScope, setSpacingScope] = useState<SpacingScope>("Side");
 
   const [search, setSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -115,7 +117,7 @@ export default function App({ initialTheme, components, initialSettings, storage
                 ? spacing
                 : {
                     ...spacing,
-                    [message.path]: { ...spacing[message.path], [message.property]: message.value },
+                    [message.path]: { ...spacing[message.path], ...message.edits },
                   },
           );
 
@@ -177,10 +179,11 @@ export default function App({ initialTheme, components, initialSettings, storage
         canvas,
         theme,
         inspectSpacing: inspecting,
+        spacingScope,
       } satisfies RenderMessage,
       location.origin,
     );
-  }, [selected.id, canvas, theme, previewVersion, inspecting]);
+  }, [selected.id, canvas, theme, previewVersion, inspecting, spacingScope]);
   useEffect(() => {
     try {
       localStorage.setItem(
@@ -201,11 +204,28 @@ export default function App({ initialTheme, components, initialSettings, storage
   useEffect(() => {
     const exit = (event: KeyboardEvent) => {
       if (event.key === "Escape") setInspecting(false);
+
+      preview.current?.contentWindow?.postMessage(
+        { type: "spacing-modifier", alt: event.altKey, meta: event.metaKey },
+        location.origin,
+      );
     };
 
-    window.addEventListener("keydown", exit);
+    const blur = () =>
+      preview.current?.contentWindow?.postMessage(
+        { type: "spacing-modifier", alt: false, meta: false },
+        location.origin,
+      );
 
-    return () => window.removeEventListener("keydown", exit);
+    window.addEventListener("keydown", exit);
+    window.addEventListener("keyup", exit);
+    window.addEventListener("blur", blur);
+
+    return () => {
+      window.removeEventListener("keydown", exit);
+      window.removeEventListener("keyup", exit);
+      window.removeEventListener("blur", blur);
+    };
   }, []);
 
   function modifyCanvas(update: (current: Canvas) => Canvas) {
@@ -332,27 +352,48 @@ export default function App({ initialTheme, components, initialSettings, storage
             onResize={(value) => panels.resize("height", value)}
           />
           <section aria-label="Component controls" className="min-h-0 overflow-auto p-3">
-            <div className="flex items-center justify-end gap-1">
-              <button
-                type="button"
-                aria-label="Inspect spacing"
-                title={inspecting ? "Spacing inspector · Esc to exit" : "Inspect spacing"}
-                aria-pressed={inspecting}
-                onClick={() => setInspecting((value) => !value)}
-                className="mr-auto grid size-6 place-items-center rounded text-(--lab-muted) hover:bg-(--lab-control) aria-pressed:bg-(--lab-active) aria-pressed:text-(--lab-text)"
-              >
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 16 16"
-                  className="size-3.5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.3"
-                  strokeLinejoin="round"
+            <div className="flex flex-wrap items-center justify-end gap-1">
+              <div className="mr-auto flex items-center gap-1">
+                <button
+                  type="button"
+                  aria-label="Inspect spacing"
+                  title={inspecting ? "Spacing inspector · Esc to exit" : "Inspect spacing"}
+                  aria-pressed={inspecting}
+                  onClick={() => setInspecting((value) => !value)}
+                  className="grid size-6 place-items-center rounded text-(--lab-muted) hover:bg-(--lab-control) aria-pressed:bg-(--lab-active) aria-pressed:text-(--lab-text)"
                 >
-                  <path d="m3 2 10 6-5 1-2 5Z" />
-                </svg>
-              </button>
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 16 16"
+                    className="size-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.3"
+                    strokeLinejoin="round"
+                  >
+                    <path d="m3 2 10 6-5 1-2 5Z" />
+                  </svg>
+                </button>
+                {inspecting ? (
+                  <div
+                    role="group"
+                    aria-label="Spacing scope"
+                    className="flex rounded bg-(--lab-control) p-0.5"
+                  >
+                    {spacingScopes.map((scope) => (
+                      <button
+                        key={scope}
+                        type="button"
+                        aria-pressed={spacingScope === scope}
+                        onClick={() => setSpacingScope(scope)}
+                        className="h-5 rounded px-1.5 text-[9px] text-(--lab-faint) hover:text-(--lab-text) aria-pressed:bg-(--lab-active) aria-pressed:text-(--lab-text)"
+                      >
+                        {scope}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
               {Object.keys(instance.spacing ?? {}).length ? (
                 <button
                   type="button"
@@ -382,7 +423,7 @@ export default function App({ initialTheme, components, initialSettings, storage
             {inspecting ? (
               <div
                 aria-label="Spacing colors"
-                title="Scroll over a colored region to adjust it. Shift for fine adjustment."
+                title="Scroll to adjust spacing. Command temporarily targets all sides. Shift for fine adjustment. Option/Alt targets margins."
                 className="mt-2 flex flex-wrap gap-3 text-[9px] text-(--lab-faint)"
               >
                 {[

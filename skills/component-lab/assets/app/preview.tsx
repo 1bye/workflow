@@ -144,6 +144,7 @@ function Preview() {
       </main>
       <SpacingInspector
         enabled={data.inspectSpacing ?? false}
+        scope={data.spacingScope ?? "Side"}
         theme={data.theme}
         componentId={data.id}
         revision={data.canvas}

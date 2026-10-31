@@ -2,12 +2,41 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { cp, lstat, readFile, realpath, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { parseArgs } from "node:util";
+import { isDeepStrictEqual, parseArgs } from "node:util";
 import { createServer, type Plugin } from "vite";
 import { exampleRoot, labConfig } from "../vite.config.ts";
 import { isRecord, validateSettings } from "../assets/settings.ts";
 
 export { validateSettings };
+
+function draftConfig(workspace: string, skill: string) {
+  return {
+    extends: relative(workspace, join(skill, "tsconfig.json")).replaceAll("\\", "/"),
+    compilerOptions: {
+      types: [join(skill, "node_modules/vite/client.d.ts")],
+      paths: {
+        "@local": [join(skill, "assets/schema/index.ts")],
+        react: [join(skill, "node_modules/@types/react/index.d.ts")],
+        "react/*": [join(skill, "node_modules/@types/react/*")],
+      },
+    },
+    include: ["components/**/*.ts", "components/**/*.tsx"],
+  };
+}
+
+function isLegacyConfig(source: string, workspace: string): boolean {
+  try {
+    const config = JSON.parse(source);
+    const schema = config?.compilerOptions?.paths?.["@local"]?.[0];
+
+    return (
+      typeof schema === "string" &&
+      isDeepStrictEqual(config, draftConfig(workspace, resolve(dirname(schema), "../..")))
+    );
+  } catch {
+    return false;
+  }
+}
 
 export async function initialize(project: string): Promise<string> {
   const root = await realpath(project);
@@ -29,23 +58,36 @@ export async function initialize(project: string): Promise<string> {
     await cp(exampleRoot, workspace, { recursive: true, force: false, errorOnExist: true });
   }
 
-  const config = {
-    extends: relative(workspace, resolve(exampleRoot, "../../tsconfig.json")).replaceAll("\\", "/"),
-    compilerOptions: {
-      types: [resolve(exampleRoot, "../../node_modules/vite/client.d.ts")],
-      paths: {
-        "@local": [resolve(exampleRoot, "../schema/index.ts")],
-        react: [resolve(exampleRoot, "../../node_modules/@types/react/index.d.ts")],
-        "react/*": [resolve(exampleRoot, "../../node_modules/@types/react/*")],
-      },
-    },
-    include: ["components/**/*.ts", "components/**/*.tsx"],
-  };
+  const generated = join(workspace, "tsconfig.generated.json");
 
-  await writeFile(join(workspace, "tsconfig.json"), `${JSON.stringify(config, null, 2)}\n`, {
+  const generatedStat = await lstat(generated).catch((error: unknown) => {
+    if (!isRecord(error) || error.code !== "ENOENT") throw error;
+
+    return null;
+  });
+
+  if (generatedStat && !generatedStat.isFile())
+    throw new Error("tsconfig.generated.json must be a regular file.");
+
+  // This file owns machine-specific paths; the editable project config extends it.
+  await writeFile(
+    generated,
+    `${JSON.stringify(draftConfig(workspace, resolve(exampleRoot, "../..")), null, 2)}\n`,
+  );
+  const configPath = join(workspace, "tsconfig.json");
+  const config = `${JSON.stringify({ extends: "./tsconfig.generated.json" }, null, 2)}\n`;
+
+  await writeFile(configPath, config, {
     flag: "wx",
-  }).catch((error: unknown) => {
+  }).catch(async (error: unknown) => {
     if (!isRecord(error) || error.code !== "EEXIST") throw error;
+
+    // Upgrade only an untouched config produced by the original launcher.
+    if (
+      !(await lstat(configPath)).isSymbolicLink() &&
+      isLegacyConfig(await readFile(configPath, "utf8"), workspace)
+    )
+      await writeFile(configPath, config);
   });
 
   if (!(await stat(join(workspace, "components"))).isDirectory())

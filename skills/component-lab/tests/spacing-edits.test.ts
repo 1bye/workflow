@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { isSpacingEdits, spacingCSS, wheelSpacing } from "../assets/app/spacing-edits.ts";
-import { isSpacingMessage } from "../assets/app/types.ts";
+import {
+  isSpacingEdits,
+  scopedProperties,
+  spacingCSS,
+  wheelSpacing,
+  wheelSpacingValues,
+} from "../assets/app/spacing-edits.ts";
+import { isRenderMessage, isSpacingMessage } from "../assets/app/types.ts";
 import { createCanvas, duplicateInstance, editSpacing, isCanvas } from "../assets/app/canvas.ts";
 import { restoreWorkspace, replaceCanvas } from "../assets/app/state.ts";
 import * as Schema from "../assets/schema/index.ts";
@@ -14,6 +20,48 @@ test("spacing gestures clamp padding and gaps, retain negative margins and offer
   assert.equal(wheelSpacing(4, 100, "row-gap", false), 0);
   assert.equal(wheelSpacing(4, 100, "margin-top", false), -21);
   assert.equal(wheelSpacing(4090, -100, "column-gap", false), 4096);
+});
+
+test("scopes affect only the hovered element's padding or margin axes, leaving gaps independent", () => {
+  assert.deepEqual(scopedProperties("padding-left", "Side"), ["padding-left"]);
+  assert.deepEqual(scopedProperties("padding-top", "X"), ["padding-left", "padding-right"]);
+  assert.deepEqual(scopedProperties("margin-left", "Y"), ["margin-top", "margin-bottom"]);
+  assert.deepEqual(scopedProperties("margin-left", "All"), [
+    "margin-top",
+    "margin-right",
+    "margin-bottom",
+    "margin-left",
+  ]);
+  assert.deepEqual(scopedProperties("column-gap", "All"), ["column-gap"]);
+});
+
+test("group scrolling preserves asymmetric spacing, including when a side reaches a limit", () => {
+  const base = { "padding-top": 8, "padding-right": 12, "padding-bottom": 8, "padding-left": 12 };
+
+  assert.deepEqual(wheelSpacingValues(base, -8, false), {
+    "padding-top": 10,
+    "padding-right": 14,
+    "padding-bottom": 10,
+    "padding-left": 14,
+  });
+  assert.deepEqual(wheelSpacingValues(base, 100, false), {
+    "padding-top": 0,
+    "padding-right": 4,
+    "padding-bottom": 0,
+    "padding-left": 4,
+  });
+  assert.deepEqual(wheelSpacingValues({ "margin-left": -8, "margin-right": 12 }, 8, false), {
+    "margin-left": -10,
+    "margin-right": 10,
+  });
+  assert.deepEqual(wheelSpacingValues({ "padding-left": 8.25, "padding-right": 12.5 }, -8, true), {
+    "padding-left": 8.45,
+    "padding-right": 12.7,
+  });
+  assert.deepEqual(
+    wheelSpacingValues({ "padding-left": 4090, "padding-right": 4095 }, -100, false),
+    { "padding-left": 4091, "padding-right": 4096 },
+  );
 });
 
 test("spacing edits validate finite, allowlisted values and safe component paths", () => {
@@ -36,13 +84,31 @@ test("spacing edits validate finite, allowlisted values and safe component paths
     id: "demo",
     instanceId: "initial",
     path: "div:0",
-    property: "row-gap",
-    value: 16,
+    edits: { "row-gap": 16 },
   };
 
   assert.equal(isSpacingMessage(message), true);
-  assert.equal(isSpacingMessage({ ...message, value: "16px" }), false);
+  assert.equal(
+    isSpacingMessage({ ...message, edits: { "padding-left": 12, "padding-right": 16 } }),
+    true,
+  );
+  assert.equal(
+    isSpacingMessage({ ...message, edits: { "padding-left": 12, "padding-right": "16px" } }),
+    false,
+  );
+  assert.equal(isSpacingMessage({ ...message, edits: { position: 16 } }), false);
+  assert.equal(isSpacingMessage({ ...message, edits: {} }), false);
   assert.equal(isSpacingMessage({ ...message, instanceId: "bad id" }), false);
+  const render = {
+    type: "render",
+    id: "demo",
+    canvas: createCanvas({}),
+    theme: "dark",
+    spacingScope: "X",
+  };
+
+  assert.equal(isRenderMessage(render), true);
+  assert.equal(isRenderMessage({ ...render, spacingScope: "invalid" }), false);
   assert.equal(
     isCanvas({
       instances: [{ id: "initial", props: {}, spacing: { "div:0": { "column-gap": NaN } } }],

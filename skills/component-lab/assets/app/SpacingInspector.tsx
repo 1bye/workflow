@@ -2,11 +2,16 @@ import { useEffect, useId, useRef, useState } from "react";
 import {
   isSpacingPath,
   isSpacingProperty,
-  wheelSpacing,
+  scopedProperties,
+  wheelSpacingValues,
   type SpacingProperty,
+  type SpacingScope,
+  type SpacingValues,
 } from "./spacing-edits";
+import { edgeHandles, gapHandles, handlePoint, handleScore } from "./spacing-handles";
 import type { Canvas } from "./canvas";
 import type { SpacingMessage } from "./types";
+import { isRecord } from "../settings";
 import type { Theme } from "./theme";
 import {
   gapRegions,
@@ -17,7 +22,8 @@ import {
   type Region,
 } from "./spacing";
 
-type Measurement = { box: Rect; tag: string; regions: Region[] };
+type Measurement = { box: Rect; regions: Region[]; handles: Region[] };
+type Handle = { region: Region; x: number; y: number; vertical: boolean };
 const colors = { margin: "#f5ad66", padding: "#79cda3", gap: "#b69af5" };
 
 function measure(element: HTMLElement): Measurement {
@@ -72,6 +78,11 @@ function measure(element: HTMLElement): Measurement {
     ...paddingRegions(inner, edges("padding")),
   ];
 
+  const handles = [
+    ...edgeHandles(inner, edges("padding"), "padding"),
+    ...edgeHandles(box, edges("margin"), "margin"),
+  ];
+
   if (css.display.includes("flex") || css.display.includes("grid")) {
     const children = Array.from(element.children)
       .filter((child) => {
@@ -90,71 +101,175 @@ function measure(element: HTMLElement): Measurement {
       .filter((child) => child.width > 0 && child.height > 0);
 
     regions.push(...gapRegions(children, px(css.columnGap) * scaleX, px(css.rowGap) * scaleY));
+    handles.push(...gapHandles(children, px(css.columnGap) * scaleX, px(css.rowGap) * scaleY));
   }
 
-  return { box, tag: element.localName, regions };
+  return { box, regions, handles };
 }
 
 export default function SpacingInspector({
   enabled,
+  scope,
   theme,
   componentId,
   revision,
 }: {
   enabled: boolean;
+  scope: SpacingScope;
   theme: Theme;
   componentId: string;
   revision: Canvas;
 }) {
   const [measurement, setMeasurement] = useState<Measurement | null>(null);
-  const [editing, setEditing] = useState<{ label: string; value: number } | null>(null);
+  const [targets, setTargets] = useState<Region[]>([]);
+  const [handle, setHandle] = useState<Handle | null>(null);
+  const scopeRef = useRef(scope);
   const refresh = useRef<() => void>(() => {});
   const pattern = useId().replace(/:/g, "");
 
   useEffect(() => {
     setMeasurement(null);
-    setEditing(null);
+    setTargets([]);
+    setHandle(null);
 
     if (!enabled) return;
 
     let hovered: HTMLElement | null = null;
     let frame = 0;
-    let feedback: ReturnType<typeof setTimeout> | undefined;
 
     let gesture: {
       element: HTMLElement;
       property: SpacingProperty;
       label: string;
-      base: number;
-      value: number;
+      base: SpacingValues;
+      values: SpacingValues;
+      scope: SpacingScope;
       delta: number;
       fine: boolean;
       x: number;
       y: number;
     } | null = null;
 
-    const contains = (region: Rect, x: number, y: number) =>
-      x >= region.x &&
-      x <= region.x + region.width &&
-      y >= region.y &&
-      y <= region.y + region.height;
+    let pointer = { x: 0, y: 0, alt: false, meta: false };
+    let raw: HTMLElement | null = null;
+    let active: { element: HTMLElement; region: Region } | null = null;
 
     const clearGesture = () => {
       gesture = null;
-      clearTimeout(feedback);
-      setEditing(null);
+    };
+
+    const effectiveScope = () => (pointer.meta ? "All" : scopeRef.current);
+
+    const propertyOf = (region: Region) =>
+      region.label.toLowerCase().replaceAll(" ", "-") as SpacingProperty;
+
+    const readValues = (
+      element: HTMLElement,
+      property: SpacingProperty,
+      scope: SpacingScope,
+    ): SpacingValues => {
+      const css = getComputedStyle(element);
+
+      return Object.fromEntries(
+        scopedProperties(property, scope).map((key) => {
+          const value = css.getPropertyValue(key);
+
+          return [key, value === "normal" || value === "auto" ? 0 : Number.parseFloat(value)];
+        }),
+      );
+    };
+
+    const resolve = () => {
+      if (gesture?.element.isConnected) {
+        const result = measure(gesture.element);
+        const region = result.handles.find((item) => item.label === gesture!.label);
+
+        if (region) return { element: gesture.element, region, result };
+      }
+
+      let best: {
+        element: HTMLElement;
+        region: Region;
+        result: Measurement;
+        score: number;
+      } | null = null;
+
+      const candidates = new Map<HTMLElement, number>();
+      let element = raw;
+
+      while (
+        element &&
+        !element.hasAttribute("data-component-preview") &&
+        element.closest("[data-component-preview]")
+      ) {
+        candidates.set(element, candidates.size);
+        element = element.parentElement;
+
+        if (candidates.size === 8) break;
+      }
+
+      if (hovered?.isConnected && !candidates.has(hovered)) candidates.set(hovered, 0);
+
+      // A child's margin receives pointer events on its parent.
+      for (const child of Array.from(raw?.children ?? []).slice(0, 100)) {
+        if (child instanceof HTMLElement && !candidates.has(child)) candidates.set(child, 0);
+      }
+
+      for (const [candidate, depth] of candidates) {
+        const result = measure(candidate);
+
+        if (!result.box.width || !result.box.height) continue;
+
+        for (const region of result.handles) {
+          const distance = handleScore(region, pointer.x, pointer.y, pointer.alt);
+
+          if (distance === null) continue;
+
+          const score = distance + depth * 0.25 + (candidate.childElementCount ? 0 : 1);
+
+          if (!best || score < best.score) best = { element: candidate, region, result, score };
+        }
+      }
+
+      return best;
     };
 
     const update = () => {
+      const target = resolve();
+
+      active = target;
+      hovered = target?.element ?? raw;
+
       if (!hovered?.isConnected) {
         setMeasurement(null);
+        setHandle(null);
+        setTargets([]);
 
         return;
       }
 
-      const result = measure(hovered);
+      const result = target?.result ?? measure(hovered);
 
       setMeasurement(result.box.width > 0 && result.box.height > 0 ? result : null);
+
+      if (target) {
+        const properties = scopedProperties(propertyOf(target.region), effectiveScope());
+
+        setTargets(result.handles.filter((region) => properties.includes(propertyOf(region))));
+        const vertical =
+          target.region.label.endsWith("left") ||
+          target.region.label.endsWith("right") ||
+          target.region.label === "Column gap";
+
+        setHandle({
+          region: target.region,
+          ...handlePoint(target.region, pointer.x, pointer.y, vertical),
+          vertical,
+        });
+      } else {
+        setHandle(null);
+        setTargets([]);
+      }
     };
 
     const schedule = () => {
@@ -165,43 +280,49 @@ export default function SpacingInspector({
     refresh.current = schedule;
 
     const move = (event: PointerEvent) => {
-      if (gesture && Math.hypot(event.clientX - gesture.x, event.clientY - gesture.y) <= 4) {
+      pointer = {
+        x: event.clientX,
+        y: event.clientY,
+        alt: event.altKey,
+        meta: event.metaKey,
+      };
+
+      if (gesture && Math.hypot(pointer.x - gesture.x, pointer.y - gesture.y) <= 4) {
         schedule();
 
         return;
       }
 
       clearGesture();
-
-      if (
-        hovered?.isConnected &&
-        measure(hovered).regions.some(
-          (region) => region.kind === "margin" && contains(region, event.clientX, event.clientY),
-        )
-      ) {
-        schedule();
-
-        return;
-      }
-
       let target = event.target instanceof Element ? event.target : null;
 
       while (target && !(target instanceof HTMLElement)) target = target.parentElement;
 
       const root = target?.closest("[data-component-preview]");
 
-      hovered = root && target !== root ? (target as HTMLElement) : null;
+      raw = root && target !== root ? (target as HTMLElement) : null;
       schedule();
     };
 
     const leave = () => {
       clearGesture();
       hovered = null;
+      raw = null;
+      active = null;
+      setHandle(null);
+      setTargets([]);
       setMeasurement(null);
     };
 
     const wheel = (event: WheelEvent) => {
       if (event.ctrlKey || !event.deltaY || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
+
+      pointer = {
+        x: event.clientX,
+        y: event.clientY,
+        alt: event.altKey,
+        meta: event.metaKey,
+      };
 
       if (
         gesture &&
@@ -211,26 +332,27 @@ export default function SpacingInspector({
         clearGesture();
 
       if (!gesture) {
-        if (!hovered?.isConnected) return;
+        active = resolve();
 
-        const region = measure(hovered).regions.find((region) =>
-          contains(region, event.clientX, event.clientY),
-        );
+        if (!active) return;
 
-        const property = region?.label.toLowerCase().replaceAll(" ", "-");
+        hovered = active.element;
+        const region = active.region;
+        const property = propertyOf(region);
 
-        if (!region || !isSpacingProperty(property)) return;
+        if (!isSpacingProperty(property)) return;
 
-        const base = Number.parseFloat(getComputedStyle(hovered).getPropertyValue(property));
+        const base = readValues(hovered, property, effectiveScope());
 
-        if (!Number.isFinite(base)) return;
+        if (!Object.values(base).every(Number.isFinite)) return;
 
         gesture = {
           element: hovered,
           property,
           label: region.label,
           base,
-          value: base,
+          values: base,
+          scope: effectiveScope(),
           delta: 0,
           fine: event.shiftKey,
           x: event.clientX,
@@ -258,10 +380,17 @@ export default function SpacingInspector({
       event.preventDefault();
       event.stopImmediatePropagation();
 
-      if (gesture.fine !== event.shiftKey) {
-        gesture.base = gesture.value;
+      if (gesture.scope !== effectiveScope() || gesture.fine !== event.shiftKey) {
+        gesture.base =
+          gesture.scope !== effectiveScope()
+            ? readValues(gesture.element, gesture.property, effectiveScope())
+            : gesture.values;
+
+        if (!Object.values(gesture.base).every(Number.isFinite)) return;
+
         gesture.delta = 0;
         gesture.fine = event.shiftKey;
+        gesture.scope = effectiveScope();
       }
 
       gesture.delta +=
@@ -271,31 +400,35 @@ export default function SpacingInspector({
           : event.deltaMode === 2
             ? document.documentElement.clientHeight
             : 1);
-      const value = wheelSpacing(gesture.base, gesture.delta, gesture.property, gesture.fine);
+      const values = wheelSpacingValues(gesture.base, gesture.delta, gesture.fine);
 
-      if (value !== gesture.value)
+      if (
+        Object.entries(values).some(
+          ([key, value]) => value !== gesture!.values[key as SpacingProperty],
+        )
+      )
         parent.postMessage(
           {
             type: "spacing-change",
             id: componentId,
             instanceId: root.dataset.instanceId,
             path,
-            property: gesture.property,
-            value,
+            edits: values,
           } satisfies SpacingMessage,
           location.origin,
         );
 
-      gesture.value = value;
+      gesture.values = values;
 
-      if (value === 4096 || value === (gesture.property.startsWith("margin") ? -4096 : 0)) {
-        gesture.base = value;
+      if (
+        Object.entries(values).some(
+          ([key, value]) => value === 4096 || value === (key.startsWith("margin") ? -4096 : 0),
+        )
+      ) {
+        gesture.base = values;
         gesture.delta = 0;
       }
 
-      setEditing({ label: gesture.label, value });
-      clearTimeout(feedback);
-      feedback = setTimeout(() => setEditing(null), 350);
       schedule();
     };
 
@@ -308,8 +441,42 @@ export default function SpacingInspector({
 
     const key = (event: KeyboardEvent) => {
       if (event.key === "Escape") exit();
+
+      if (event.altKey !== pointer.alt || event.metaKey !== pointer.meta) {
+        if (event.altKey !== pointer.alt) clearGesture();
+
+        pointer.alt = event.altKey;
+        pointer.meta = event.metaKey;
+        schedule();
+      }
     };
 
+    const modifier = (event: MessageEvent<unknown>) => {
+      if (
+        event.source === parent &&
+        event.origin === location.origin &&
+        isRecord(event.data) &&
+        event.data.type === "spacing-modifier" &&
+        typeof event.data.alt === "boolean" &&
+        typeof event.data.meta === "boolean"
+      ) {
+        if (pointer.alt !== event.data.alt) clearGesture();
+
+        pointer.alt = event.data.alt;
+        pointer.meta = event.data.meta;
+        schedule();
+      }
+    };
+
+    const blur = () => {
+      pointer.alt = false;
+      pointer.meta = false;
+      clearGesture();
+      schedule();
+    };
+
+    window.addEventListener("message", modifier);
+    window.addEventListener("blur", blur);
     const root = document.getElementById("preview-canvas");
     const observer = new MutationObserver(schedule);
     const resize = new ResizeObserver(schedule);
@@ -329,13 +496,15 @@ export default function SpacingInspector({
     document.addEventListener("pointerleave", leave);
     document.addEventListener("click", click, true);
     document.addEventListener("keydown", key, true);
+    document.addEventListener("keyup", key, true);
     window.addEventListener("scroll", schedule, true);
     window.addEventListener("resize", schedule);
 
     return () => {
       cancelAnimationFrame(frame);
-      clearTimeout(feedback);
       refresh.current = () => {};
+      window.removeEventListener("message", modifier);
+      window.removeEventListener("blur", blur);
       document.removeEventListener("wheel", wheel, true);
       observer.disconnect();
       resize.disconnect();
@@ -343,16 +512,21 @@ export default function SpacingInspector({
       document.removeEventListener("pointerleave", leave);
       document.removeEventListener("click", click, true);
       document.removeEventListener("keydown", key, true);
+      document.removeEventListener("keyup", key, true);
       window.removeEventListener("scroll", schedule, true);
       window.removeEventListener("resize", schedule);
     };
   }, [enabled, componentId]);
 
   useEffect(() => refresh.current(), [revision]);
+  useEffect(() => {
+    scopeRef.current = scope;
+    refresh.current();
+  }, [scope]);
 
   if (!enabled || !measurement) return null;
 
-  const { box, regions, tag } = measurement;
+  const { box, regions } = measurement;
 
   return (
     <svg
@@ -379,10 +553,11 @@ export default function SpacingInspector({
         const y = region.y + region.height / 2;
 
         return (
-          <g key={index} data-spacing={region.kind}>
-            <title>
-              {region.label}: {label}px
-            </title>
+          <g
+            key={index}
+            data-spacing={region.kind}
+            data-spacing-active={targets.some((target) => target.label === region.label)}
+          >
             <rect
               x={region.x}
               y={region.y}
@@ -390,7 +565,11 @@ export default function SpacingInspector({
               height={region.height}
               fill={colors[region.kind]}
               fillOpacity={
-                editing?.label === region.label ? 0.45 : region.kind === "margin" ? 0.28 : 0.22
+                targets.some((target) => target.label === region.label)
+                  ? 0.45
+                  : region.kind === "margin"
+                    ? 0.28
+                    : 0.22
               }
             />
             {region.kind === "gap" ? (
@@ -422,6 +601,20 @@ export default function SpacingInspector({
           </g>
         );
       })}
+      {targets.map((region, index) => (
+        <rect
+          key={index}
+          data-spacing-target={region.label}
+          x={region.x}
+          y={region.y}
+          width={region.width || 1}
+          height={region.height || 1}
+          fill="none"
+          stroke={colors[region.kind]}
+          strokeWidth="1"
+          strokeOpacity=".7"
+        />
+      ))}
       <rect
         x={box.x}
         y={box.y}
@@ -432,22 +625,20 @@ export default function SpacingInspector({
         strokeOpacity=".4"
         strokeWidth=".5"
       />
-      <g
-        transform={`translate(${Math.max(4, Math.min(box.x, document.documentElement.clientWidth - 132))},${Math.max(4, box.y - 23)})`}
-      >
-        <rect
-          width={editing ? "170" : "128"}
-          height="19"
-          rx="4"
-          fill="var(--lab-panel)"
-          stroke="var(--lab-border)"
-        />
-        <text x="7" y="13" fill="var(--lab-muted)" fontSize="9" fontFamily="ui-monospace,monospace">
-          {editing
-            ? `${editing.label} · ${editing.value}px`
-            : `${tag} · ${Math.round(box.width)} × ${Math.round(box.height)}`}
-        </text>
-      </g>
+      {handle ? (
+        <g data-spacing-handle={handle.region.label}>
+          <rect
+            x={handle.x - (handle.vertical ? 2 : 9)}
+            y={handle.y - (handle.vertical ? 9 : 2)}
+            width={handle.vertical ? 4 : 18}
+            height={handle.vertical ? 18 : 4}
+            rx="2"
+            fill={colors[handle.region.kind]}
+            stroke="var(--lab-bg)"
+            strokeWidth="1"
+          />
+        </g>
+      ) : null}
     </svg>
   );
 }

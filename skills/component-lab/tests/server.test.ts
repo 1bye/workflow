@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rename, rm, symlink, writeFile } from "node:fs/promises";
 import { setTimeout as delay } from "node:timers/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { test } from "node:test";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -134,6 +134,76 @@ test("initialization refuses a symlinked workspace", async () => {
   try {
     await symlink(project, join(project, ".component-lab"));
     await assert.rejects(initialize(project), /regular directory/);
+  } finally {
+    await rm(project, { recursive: true, force: true });
+  }
+});
+
+test("relaunch refreshes skill paths after moving a project and upgrades untouched legacy configs", async () => {
+  const root = await mkdtemp(join(tmpdir(), "component-lab-move-"));
+  const project = join(root, "project");
+  const moved = join(root, "nested", "moved project");
+
+  try {
+    await mkdir(project);
+    const workspace = await initialize(project);
+
+    const generated = JSON.parse(
+      await readFile(join(workspace, "tsconfig.generated.json"), "utf8"),
+    );
+
+    const skill = fileURLToPath(new URL("..", import.meta.url)).replace(/\/$/, "");
+    const oldSkill = join(root, "removed skill");
+    const legacy = JSON.parse(JSON.stringify(generated).replaceAll(skill, oldSkill));
+
+    legacy.extends = relative(workspace, join(oldSkill, "tsconfig.json")).replaceAll("\\", "/");
+    await writeFile(join(workspace, "tsconfig.json"), JSON.stringify(legacy));
+    await initialize(project);
+    assert.deepEqual(JSON.parse(await readFile(join(workspace, "tsconfig.json"), "utf8")), {
+      extends: "./tsconfig.generated.json",
+    });
+
+    const custom =
+      '{"extends":"./tsconfig.generated.json","compilerOptions":{"noUnusedLocals":false}}\n// Project-owned settings.\n';
+
+    await writeFile(join(workspace, "tsconfig.json"), custom);
+    await writeFile(join(workspace, "tsconfig.generated.json"), JSON.stringify(legacy));
+    const draft = join("components", "pin", "Pin.tsx");
+    const source = await readFile(join(workspace, draft), "utf8");
+
+    await mkdir(dirname(moved), { recursive: true });
+    await rename(project, moved);
+    const refreshed = await initialize(moved);
+
+    assert.equal(await readFile(join(refreshed, "tsconfig.json"), "utf8"), custom);
+    assert.equal(await readFile(join(refreshed, draft), "utf8"), source);
+    assert.doesNotMatch(
+      await readFile(join(refreshed, "tsconfig.generated.json"), "utf8"),
+      /removed skill/,
+    );
+    const compiler = fileURLToPath(new URL("../node_modules/typescript/bin/tsc", import.meta.url));
+
+    execFileSync(process.execPath, [compiler, "--project", join(refreshed, "tsconfig.json")], {
+      cwd: refreshed,
+      stdio: "pipe",
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("generated config refresh refuses a symlink instead of writing outside the workspace", async () => {
+  const project = await mkdtemp(join(tmpdir(), "component-lab-config-link-"));
+
+  try {
+    const workspace = await initialize(project);
+    const outside = join(project, "keep.json");
+
+    await writeFile(outside, "{}\n");
+    await rm(join(workspace, "tsconfig.generated.json"));
+    await symlink(outside, join(workspace, "tsconfig.generated.json"));
+    await assert.rejects(initialize(project), /regular file/);
+    assert.equal(await readFile(outside, "utf8"), "{}\n");
   } finally {
     await rm(project, { recursive: true, force: true });
   }

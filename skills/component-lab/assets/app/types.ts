@@ -2,7 +2,9 @@ import {
   isSpacingPath,
   isSpacingProperty,
   isSpacingValue,
-  type SpacingProperty,
+  isSpacingScope,
+  type SpacingScope,
+  type SpacingValues,
 } from "./spacing-edits";
 import type { Value } from "../schema/index";
 import { isRecord } from "../settings";
@@ -15,6 +17,7 @@ export type RenderMessage = {
   canvas: Canvas;
   theme: Theme;
   inspectSpacing?: boolean;
+  spacingScope?: SpacingScope;
 };
 
 export function isRenderMessage(value: unknown): value is RenderMessage {
@@ -24,7 +27,8 @@ export function isRenderMessage(value: unknown): value is RenderMessage {
     typeof value.id === "string" &&
     isCanvas(value.canvas) &&
     isTheme(value.theme) &&
-    (value.inspectSpacing === undefined || typeof value.inspectSpacing === "boolean")
+    (value.inspectSpacing === undefined || typeof value.inspectSpacing === "boolean") &&
+    (value.spacingScope === undefined || isSpacingScope(value.spacingScope))
   );
 }
 
@@ -93,8 +97,7 @@ export type SpacingMessage = {
   id: string;
   instanceId: string;
   path: string;
-  property: SpacingProperty;
-  value: number;
+  edits: SpacingValues;
 };
 export function isSpacingMessage(value: unknown): value is SpacingMessage {
   return (
@@ -103,7 +106,10 @@ export function isSpacingMessage(value: unknown): value is SpacingMessage {
     typeof value.id === "string" &&
     isInstanceId(value.instanceId) &&
     isSpacingPath(value.path) &&
-    isSpacingProperty(value.property) &&
-    isSpacingValue(value.property, value.value)
+    isRecord(value.edits) &&
+    Object.keys(value.edits).length > 0 &&
+    Object.entries(value.edits).every(
+      ([property, amount]) => isSpacingProperty(property) && isSpacingValue(property, amount),
+    )
   );
 }
