@@ -20,6 +20,7 @@ Personal TypeScript and Rust conventions and reusable instructions for AI coding
 | [skills/atlas/](skills/atlas/) | Language-agnostic skill that maps a system into a nested drill-down HTML canvas |
 | [skills/ui-teardown/](skills/ui-teardown/) | Skill that reverse engineers a UI into flows, principles, states, and design tokens |
 | [skills/component-lab/](skills/component-lab/SKILL.md) | TypeScript component workbench with inferred schema props, React previews, live tweaks, and resizable panels |
+| [skills/component-craft/](skills/component-craft/SKILL.md) | Checklist-driven skill for building or remaking UI components, with guides for the concerns agents forget |
 | [skills/restructure/](skills/restructure/) | Skill that reformats long AI replies into scannable Markdown without losing detail, with evals |
 | [skills/walkthrough/](skills/walkthrough/SKILL.md) | Skill that turns "what's next?" into step cards and code-level previews: before/after snippets, what goes away, failure points, and checks |
 | [skills/ui-evolution-video/](skills/ui-evolution-video/SKILL.md) | UI morph and redesign video skill with capture tools, a Remotion template, bundled reference, and artifact evals |
