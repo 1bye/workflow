@@ -1,0 +1,16 @@
+{
+  "prompt": "Author a new design system for this product and write DESIGN.md and COMPONENTS.md in the current directory. Do not ask me questions; these are all my answers.\n\nProduct: Trailmate, an iOS and Android app for hikers to plan routes and log hikes offline. Audience: casual weekend hikers. Density: calm and glanceable, often used outdoors in bright sun. Feel: grounded, sturdy, trustworthy; closest product in feel is a good paper trail map. Brand: logo color is a deep forest green; no required fonts. Color stance: neutral base with one accent plus clear status colors for weather warnings. Light and dark mode both required. Shape: soft but not pill-heavy. Motion: subtle feedback only. First screens: route list, route detail with elevation profile, live hike tracking with distance and time, and a weather warning banner.",
+  "noInventedColors": false,
+  "facts": [
+    { "id": "motion-section", "must": ["## Motion"] },
+    { "id": "dos-donts", "must": ["## Do's and Don'ts"] },
+    { "id": "dark-mode", "must": [["dark"]] },
+    { "id": "reduced-motion", "must": [["reduced motion", "reduced-motion", "prefers-reduced-motion"]] },
+    { "id": "warning-banner", "must": [["WeatherBanner", "WarningBanner", "WeatherWarning", "Banner"]] },
+    { "id": "elevation-profile", "must": [["ElevationProfile", "ElevationChart"]] },
+    { "id": "route-list", "must": [["RouteCard", "RouteRow", "RouteList", "RouteListItem"]] },
+    { "id": "live-stat", "must": [["Stat", "Metric", "LiveStat", "HikeStat"]] }
+  ],
+  "report": [],
+  "todos": false
+}

@@ -1,0 +1,170 @@
+{
+  "fixture": "shadcn-app",
+  "prompt": "Remake the Input component in src/components/ui/input.tsx. It's the stock shadcn one and I don't like that it looks like every shadcn app; it should feel like it belongs to this project. Keep every place that uses it working. Don't ask me questions, decide and record your decisions.",
+  "component": "src/components/ui/input.tsx",
+  "checklist": {
+    "mode": "remake",
+    "kind": [
+      "text input",
+      "text-input",
+      "input"
+    ]
+  },
+  "code": [
+    {
+      "id": "spreads native props",
+      "any": [
+        "\\{\\s*\\.\\.\\.(props|rest)"
+      ]
+    },
+    {
+      "id": "ref reaches the input",
+      "any": [
+        "forwardRef",
+        "ComponentProps<\"input\">",
+        "ComponentPropsWithRef<\"input\">",
+        "\\bref\\b"
+      ]
+    },
+    {
+      "id": "focus-visible state",
+      "any": [
+        "focus-visible"
+      ]
+    },
+    {
+      "id": "invalid state",
+      "any": [
+        "aria-invalid",
+        "data-invalid",
+        "data-\\[invalid",
+        "invalid:"
+      ]
+    },
+    {
+      "id": "read-only state",
+      "any": [
+        "read-only",
+        "readonly",
+        "readOnly"
+      ]
+    },
+    {
+      "id": "disabled state",
+      "any": [
+        "disabled"
+      ]
+    },
+    {
+      "id": "autofill styled",
+      "any": [
+        "autofill",
+        "-webkit-autofill"
+      ],
+      "record": [
+        "autofill"
+      ]
+    },
+    {
+      "id": "placeholder styled",
+      "any": [
+        "placeholder"
+      ]
+    },
+    {
+      "id": "16px text on mobile (no iOS zoom)",
+      "any": [
+        "text-base",
+        "text-\\[16px\\]",
+        "16px",
+        "text-\\[1rem\\]"
+      ]
+    },
+    {
+      "id": "height matches Button (h-11)",
+      "any": [
+        "h-11",
+        "44px",
+        "2\\.75rem"
+      ]
+    },
+    {
+      "id": "forced colors considered",
+      "any": [
+        "forced-colors",
+        "forced-color"
+      ],
+      "record": [
+        "forced colors",
+        "forced-colors"
+      ]
+    }
+  ],
+  "forbidden": [
+    {
+      "id": "raw color literal in component",
+      "pattern": "#[0-9a-fA-F]{3,8}\\b|rgba?\\(|oklch\\(|hsl\\("
+    }
+  ],
+  "report": [
+    {
+      "id": "names the checklist",
+      "must": [
+        [
+          ".component-craft"
+        ]
+      ]
+    },
+    {
+      "id": "lists deferred items",
+      "must": [
+        [
+          "deferred",
+          "not verified",
+          "unverified",
+          "not viewed",
+          "still to"
+        ]
+      ],
+      "minBullets": 3
+    },
+    {
+      "id": "names call sites",
+      "must": [
+        [
+          "login"
+        ],
+        [
+          "search"
+        ],
+        [
+          "profile"
+        ],
+        [
+          "promo"
+        ]
+      ]
+    }
+  ],
+  "callSiteKeys": [
+    [
+      "login-form",
+      "login"
+    ],
+    [
+      "search-bar",
+      "search"
+    ],
+    [
+      "profile-form",
+      "profile"
+    ],
+    [
+      "promo-code",
+      "promo"
+    ]
+  ],
+  "forbiddenPaths": [
+    ".component-lab"
+  ]
+}

@@ -57,8 +57,18 @@ Pick from the request:
    `css-vars`, `dtcg` (W3C tokens). Motion, elevation, and layer values live in
    prose, so export skips them; add them to the generated CSS by hand.
 6. Optionally render a visual sheet from both files: [sheet](references/sheet.md).
-7. Report: what was written, inferred values the user should confirm, lint
-   result, and open gaps.
+7. Report to the user in your final message. Documenting something inside the
+   files is not reporting it; the user reads your message, not every line.
+   Name concrete values, not counts:
+   - **Contrast failures**: each pair with both colors and the ratio
+     (`off #8C939D on surface #FFFFFF: 3.1:1, used for "In use" labels`).
+   - **Merges and drops**: each value you folded into another token or left
+     out, and why (`divider #E8E3DA merged into line #E7E2D9`).
+   - **Inferences**: names or values you chose that the source did not state.
+   - **Gaps**: the most important `TODO(confirm)` items, grouped.
+   - Lint and cross-check result in one line.
+
+   Bad: "Three contrast warnings are documented." Good: the list above.
 
 ## Rules
 

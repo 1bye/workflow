@@ -33,12 +33,22 @@ decide style. Your job is to make sure nothing was skipped by accident.
    its "done when" bar is met. Mark a to-do `deferred` with a reason instead
    of ticking something half done.
 5. **Iterate visibly.** Show the component in every state you claim to
-   support. If the project has [component-lab](../component-lab/SKILL.md)
-   installed, use it for side-by-side variants and live controls; otherwise
-   use the project's own playground, Storybook, or a temporary page.
-6. **Close out.** Summarize decisions, deferred items, and anything the user
-   should review. Keep the checklist file: it is the component's design
-   record for the next iteration.
+   support. Use what the project already has: an existing `.component-lab/`
+   workspace (with the component-lab skill available), Storybook, or a
+   playground route. If it has none, use a temporary page and remove it
+   afterwards; do not set up a new tool's workspace unless the user asks.
+6. **Close out.** Keep the checklist file: it is the component's design
+   record for the next iteration. Then report in your final message; the
+   user reads the message, not the checklist. Name concrete items, not counts:
+   - **Decisions**: the look and API choices, and why (`h-11 to line up
+     with Button`; `autofill left to the browser so its indicator stays`).
+   - **Deferred**: each `[>]` item as a bullet with what is left to do
+     (`forced colors: not viewed, no browser available`).
+   - **Call sites**: which usages were checked, changed, or need a look.
+   - **Trade-offs the user may disagree with** (`promo keeps its 12px
+     override, so iOS zooms there`).
+
+   Bad: "Live visual checks were blocked." Good: the list above.
 
 ## Guides
 

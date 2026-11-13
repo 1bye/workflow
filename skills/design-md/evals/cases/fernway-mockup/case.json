@@ -1,0 +1,147 @@
+{
+  "prompt": "Extract a DESIGN.md and COMPONENTS.md for this app from source/mockup.html. Write both files in the current directory.",
+  "noInventedColors": true,
+  "facts": [
+    {
+      "id": "accent",
+      "must": [
+        [
+          "#2F6B4F",
+          "#2f6b4f"
+        ]
+      ]
+    },
+    {
+      "id": "paper",
+      "must": [
+        [
+          "#FBF8F3",
+          "#fbf8f3"
+        ]
+      ]
+    },
+    {
+      "id": "ink",
+      "must": [
+        [
+          "#1F2421",
+          "#1f2421"
+        ]
+      ]
+    },
+    {
+      "id": "display-font",
+      "must": [
+        "Fraunces"
+      ]
+    },
+    {
+      "id": "body-font",
+      "must": [
+        [
+          "IBM Plex Sans",
+          "IBMPlexSans"
+        ]
+      ]
+    },
+    {
+      "id": "card-radius",
+      "must": [
+        "12px"
+      ]
+    },
+    {
+      "id": "sheet-radius",
+      "must": [
+        "20px"
+      ]
+    },
+    {
+      "id": "button-height",
+      "must": [
+        "44px"
+      ]
+    },
+    {
+      "id": "motion-button",
+      "must": [
+        "150ms"
+      ]
+    },
+    {
+      "id": "motion-toast",
+      "must": [
+        "200ms"
+      ]
+    },
+    {
+      "id": "one-primary",
+      "must": [
+        [
+          "one primary",
+          "single primary",
+          "one primary action"
+        ]
+      ]
+    },
+    {
+      "id": "sync-component",
+      "must": [
+        [
+          "SyncStatus",
+          "SyncIndicator",
+          "Sync"
+        ]
+      ]
+    },
+    {
+      "id": "note-card",
+      "must": [
+        "NoteCard"
+      ]
+    },
+    {
+      "id": "toast",
+      "must": [
+        "Toast"
+      ]
+    },
+    {
+      "id": "reduced-motion",
+      "must": [
+        [
+          "reduced motion",
+          "reduced-motion",
+          "prefers-reduced-motion"
+        ]
+      ]
+    }
+  ],
+  "report": [
+    {
+      "id": "contrast-stone",
+      "must": [
+        [
+          "contrast"
+        ],
+        [
+          "#A7ABA6",
+          "#a7aba6",
+          "stone"
+        ]
+      ],
+      "why": "--stone #A7ABA6 is used for text (offline sync, placeholder, disabled) and fails AA on white and paper"
+    },
+    {
+      "id": "near-duplicate-line",
+      "must": [
+        [
+          "#E8E3DA",
+          "#e8e3da"
+        ]
+      ],
+      "why": "divider #E8E3DA is a one-off near-duplicate of --line #E7E2D9; a merge must be reported to the user"
+    }
+  ],
+  "todos": true
+}

@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+/* Project tokens. Field-notes app: warm paper, ink, one moss accent. */
+@theme {
+  --color-background: #FBF8F3;
+  --color-surface: #FFFFFF;
+  --color-foreground: #1F2421;
+  --color-muted-foreground: #5A635D;
+  --color-border: #E7E2D9;
+  --color-input: #D9D3C7;
+  --color-ring: #2F6B4F;
+  --color-primary: #2F6B4F;
+  --color-primary-foreground: #FFFFFF;
+  --color-destructive: #A3223A;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+  --ease-out-soft: cubic-bezier(0.2, 0, 0, 1);
+}

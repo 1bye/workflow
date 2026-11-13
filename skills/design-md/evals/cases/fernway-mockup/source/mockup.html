@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Fernway notes: screens</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:wght@400;600&family=IBM+Plex+Sans:wght@400;500&display=swap">
+<style>
+  /* Fernway: a quiet note-taking app for field researchers. */
+  :root {
+    --paper: #FBF8F3;
+    --card: #FFFFFF;
+    --ink: #1F2421;
+    --ink-soft: #5A635D;
+    --line: #E7E2D9;
+    --moss: #2F6B4F;
+    --moss-tint: #E3EFE8;
+    --amber: #A35B00;
+    --stone: #A7ABA6;
+    --berry: #A3223A;
+  }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 400 15px/1.5 "IBM Plex Sans", sans-serif; }
+  .screen { width: 390px; padding: 24px 16px; display: flex; flex-direction: column; gap: 12px; }
+  h1 { font: 600 30px/1.15 Fraunces, serif; letter-spacing: -0.5px; margin: 0; }
+  h2 { font: 600 20px/1.2 Fraunces, serif; margin: 0; }
+  .meta { font-size: 13px; color: var(--ink-soft); }
+  .tiny { font-size: 11px; letter-spacing: 0.4px; text-transform: uppercase; color: var(--ink-soft); font-weight: 500; }
+
+  .note-card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 6px; }
+  .note-card.pinned { border-color: var(--moss); }
+  .note-card .tag { align-self: flex-start; background: var(--moss-tint); color: var(--moss); border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 500; }
+
+  .btn { height: 44px; padding: 0 20px; border-radius: 8px; border: 0; font: 500 15px "IBM Plex Sans", sans-serif; transition: background 150ms ease-out; }
+  .btn-primary { background: var(--moss); color: #FFFFFF; }
+  .btn-primary:hover { background: #255A41; }
+  .btn-ghost { background: transparent; color: var(--moss); }
+  .btn-danger { background: var(--berry); color: #FFFFFF; }
+  .btn[disabled] { background: var(--line); color: var(--stone); }
+
+  .sync { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+  .sync .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .sync.ok .dot { background: var(--moss); }
+  .sync.pending .dot { background: var(--amber); }
+  .sync.offline { color: var(--stone); }
+  .sync.offline .dot { background: var(--stone); }
+
+  .search { height: 44px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); padding: 0 12px; font: inherit; color: var(--ink); }
+  .search::placeholder { color: var(--stone); }
+
+  .sheet { background: var(--card); border-radius: 20px 20px 0 0; padding: 20px 16px; box-shadow: 0 -4px 16px rgba(31, 36, 33, 0.10); }
+  .toast { background: var(--ink); color: var(--paper); border-radius: 8px; padding: 12px 16px; font-size: 14px; animation: rise 200ms ease-out; }
+  @keyframes rise { from { transform: translateY(8px); opacity: 0; } }
+  .divider { height: 1px; background: #E8E3DA; }
+</style>
+</head>
+<body>
+<!-- Screen: Notes list -->
+<section class="screen">
+  <div class="tiny">Field notes</div>
+  <h1>Riverbank survey</h1>
+  <input class="search" placeholder="Search notes">
+  <div class="sync ok"><span class="dot"></span>Synced</div>
+  <article class="note-card pinned">
+    <span class="tag">Pinned</span>
+    <h2>Heron nesting site</h2>
+    <p class="meta">Edited 9:41 AM · 3 photos</p>
+  </article>
+  <article class="note-card">
+    <span class="tag">Water quality</span>
+    <h2>Sample point 4</h2>
+    <p class="meta">Edited yesterday</p>
+  </article>
+  <div class="divider"></div>
+  <div class="sync pending"><span class="dot"></span>2 notes waiting to sync</div>
+  <div class="sync offline"><span class="dot"></span>Offline. Notes are saved on this device.</div>
+  <button class="btn btn-primary">New note</button>
+</section>
+
+<!-- Screen: Note actions sheet -->
+<section class="screen">
+  <div class="sheet">
+    <h2>Sample point 4</h2>
+    <p class="meta">Choose an action. Only one primary action per sheet.</p>
+    <button class="btn btn-primary">Export</button>
+    <button class="btn btn-ghost">Duplicate</button>
+    <button class="btn btn-danger">Delete note</button>
+    <button class="btn" disabled>Share (needs connection)</button>
+  </div>
+  <div class="toast">Note exported</div>
+</section>
+</body>
+</html>
