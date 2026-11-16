@@ -26,6 +26,38 @@ Personal TypeScript and Rust conventions and reusable instructions for AI coding
 | [skills/walkthrough/](skills/walkthrough/SKILL.md) | Skill that turns "what's next?" into step cards and code-level previews: before/after snippets, what goes away, failure points, and checks |
 | [skills/ui-evolution-video/](skills/ui-evolution-video/SKILL.md) | UI morph and redesign video skill with capture tools, a Remotion template, bundled reference, and artifact evals |
 | [scripts/install.ts](scripts/install.ts) | Bun installer with previews, profile selection, and conflict checks |
+| [scripts/link-skills.ts](scripts/link-skills.ts) | Global skill symlinks for major coding agents, with previews and backups |
+
+## Link skills globally
+
+With [Bun](https://bun.sh) installed, run from this checkout:
+
+```sh
+bun run link-skills
+
+# Preview without changing anything.
+bun run link-skills --dry-run
+```
+
+No `bun install` is needed. The script discovers every skill under `skills/`,
+`ts/skills/`, and `rust/skills/` and symlinks complete folders into the global skill
+locations for Codex, Claude Code, Cursor, GitHub Copilot, Gemini CLI, Antigravity,
+Windsurf, OpenCode, Amp, Continue, Roo Code, Kilo Code, Kiro, Augment, and Droid.
+Paths follow the [Agent Skills CLI registry](https://github.com/vercel-labs/skills/blob/main/docs/agents.md).
+It creates those locations even for agents not yet installed. This installs skills
+for the current user; it does not install agents or global coding conventions.
+
+Existing entries pointing elsewhere (including dangling links) are moved to
+`~/.local/state/workflow-skill-backups/<unique-id>/`, preserving their original
+relative paths. Unrelated skills and links already pointing here are left alone.
+Rerun the command to link newly added skills; removed or renamed skills are not
+pruned. Filesystem errors stop the script and may leave a partial run; fix the
+reported issue and rerun. Backups remain available for manual restoration.
+
+Keep this checkout at the same path: edits and pulls update the linked skills
+immediately. Open a new agent session after linking. The script targets macOS/Linux
+and requires filesystem symlink support; individual agents may require their own
+runtimes, tools, or configuration to use a skill.
 
 ## Install in a project
 
